@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子礼物</title>
+    <style>
+        :root {
+            --gold: #f0bf62;
+            --gold-soft: rgba(240, 191, 98, 0.18);
+            --ink: #05070d;
+            --panel: rgba(5, 7, 13, 0.72);
+            --line: rgba(240, 191, 98, 0.28);
+            --text: #f7ead1;
+            --muted: rgba(247, 234, 209, 0.62);
+            --blue: #86d6ff;
+            --red: #ff7f58;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #03050b;
+            color: var(--text);
+            font-family: "Baskerville", "Songti SC", "STSong", Georgia, serif;
+            user-select: none;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 18% 25%, rgba(155, 55, 34, 0.22), transparent 30%),
+                radial-gradient(circle at 78% 44%, rgba(42, 112, 190, 0.24), transparent 34%),
+                linear-gradient(130deg, #06040b 0%, #07121f 54%, #020309 100%);
+            pointer-events: none;
+        }
+
+        body[data-stage="tree"]::before {
+            background:
+                radial-gradient(circle at 20% 28%, rgba(192, 48, 45, 0.2), transparent 28%),
+                radial-gradient(circle at 76% 42%, rgba(34, 118, 92, 0.22), transparent 34%),
+                radial-gradient(circle at 50% 110%, rgba(240, 191, 98, 0.18), transparent 42%),
+                linear-gradient(150deg, #07050a 0%, #07150f 50%, #020309 100%);
+        }
+
+        #scene {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+        }
+
+        .chrome {
+            position: fixed;
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        .chrome * {
+            pointer-events: auto;
+        }
+
+        .title-block {
+            top: 28px;
+            left: 34px;
+            max-width: min(460px, calc(100vw - 120px));
+        }
+
+        .mode-switch {
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            padding: 6px;
+            border: 1px solid rgba(240, 191, 98, 0.24);
+            border-radius: 8px;
+            background: rgba(5, 7, 13, 0.56);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 18px 70px rgba(0, 0, 0, 0.32);
+        }
+
+        .mode-tab {
+            min-width: 104px;
+            height: 38px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: rgba(247, 234, 209, 0.62);
+            font: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 180ms ease, background 180ms ease, border-color 180ms ease, transform 180ms ease;
+        }
+
+        .mode-tab:hover {
+            color: var(--text);
+            transform: translateY(-1px);
+        }
+
+        .mode-tab.active {
+            color: var(--text);
+            border-color: color-mix(in srgb, var(--active-planet, var(--gold)) 54%, transparent);
+            background: color-mix(in srgb, var(--active-planet, var(--gold)) 16%, transparent);
+            box-shadow: inset 0 0 18px color-mix(in srgb, var(--active-planet, var(--gold)) 18%, transparent);
+        }
+
+        .eyebrow {
+            color: var(--gold);
+            font-size: 12px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0.86;
+        }
+
+        h1 {
+            margin: 8px 0 0;
+            font-size: clamp(32px, 5vw, 68px);
+            line-height: 0.94;
+            font-weight: 600;
+            letter-spacing: 0;
+            text-shadow: 0 0 34px rgba(240, 191, 98, 0.22);
+        }
+
+        .planet-readout {
+            right: 34px;
+            top: 30px;
+            width: 292px;
+            padding: 18px 18px 16px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(9, 12, 21, 0.82), rgba(5, 7, 13, 0.62));
+            backdrop-filter: blur(18px);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+            transition: opacity 240ms ease, transform 240ms ease;
+        }
+
+        .tree-readout {
+            right: 34px;
+            top: 30px;
+            width: 292px;
+            padding: 18px 18px 16px;
+            border: 1px solid rgba(103, 222, 153, 0.28);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(6, 20, 14, 0.82), rgba(6, 8, 10, 0.66));
+            backdrop-filter: blur(18px);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38), inset 0 0 24px rgba(42, 148, 93, 0.08);
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+            transition: opacity 240ms ease, transform 240ms ease;
+        }
+
+        .readout-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .readout-swatch {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--active-planet, #e6aa56);
+            box-shadow: 0 0 26px var(--active-glow, rgba(240, 191, 98, 0.45));
+            flex: 0 0 auto;
+        }
+
+        .tree-swatch {
+            background: radial-gradient(circle at 40% 35%, #fff7c9, #f0bf62 42%, #2f9b61 70%, #16472e);
+            box-shadow: 0 0 28px rgba(103, 222, 153, 0.44);
+        }
+
+        #planet-name {
+            font-size: 24px;
+            line-height: 1;
+        }
+
+        #planet-en {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #planet-summary {
+            margin: 14px 0 0;
+            color: rgba(247, 234, 209, 0.78);
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .metric {
+            min-width: 0;
+            border-top: 1px solid rgba(240, 191, 98, 0.2);
+            padding-top: 8px;
+        }
+
+        .metric-value {
+            display: block;
+            font-size: 13px;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .metric-label {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: 1.4px;
+        }
+
+        .planet-nav {
+            left: 50%;
+            bottom: 28px;
+            transform: translateX(-50%);
+            width: min(1040px, calc(100vw - 36px));
+            display: grid;
+            grid-template-columns: repeat(8, minmax(0, 1fr));
+            gap: 8px;
+            padding: 8px;
+            border: 1px solid rgba(240, 191, 98, 0.22);
+            border-radius: 8px;
+            background: rgba(4, 6, 12, 0.62);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 16px 70px rgba(0, 0, 0, 0.42);
+            transition: opacity 240ms ease, transform 240ms ease;
+        }
+
+        .planet-button {
+            min-width: 0;
+            height: 54px;
+            border: 1px solid rgba(247, 234, 209, 0.14);
+            border-radius: 6px;
+            background: rgba(247, 234, 209, 0.035);
+            color: rgba(247, 234, 209, 0.7);
+            font: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+        }
+
+        .planet-button:hover {
+            transform: translateY(-2px);
+            border-color: rgba(247, 234, 209, 0.34);
+            color: var(--text);
+            background: rgba(247, 234, 209, 0.07);
+        }
+
+        .planet-button.active {
+            border-color: var(--planet-color);
+            color: var(--text);
+            background: linear-gradient(180deg, color-mix(in srgb, var(--planet-color) 16%, transparent), rgba(247, 234, 209, 0.04));
+            box-shadow: inset 0 0 18px color-mix(in srgb, var(--planet-color) 20%, transparent), 0 0 26px color-mix(in srgb, var(--planet-color) 18%, transparent);
+        }
+
+        .nav-orb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--planet-color);
+            box-shadow: 0 0 16px color-mix(in srgb, var(--planet-color) 56%, transparent);
+            flex: 0 0 auto;
+        }
+
+        .nav-label {
+            min-width: 0;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .fullscreen-button {
+            top: 30px;
+            right: 350px;
+            width: 42px;
+            height: 42px;
+            border: 1px solid rgba(240, 191, 98, 0.28);
+            border-radius: 50%;
+            background: rgba(5, 7, 13, 0.58);
+            color: var(--gold);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(14px);
+            transition: transform 180ms ease, color 180ms ease, border-color 180ms ease;
+        }
+
+        body[data-stage="tree"] .planet-readout,
+        body[data-stage="tree"] .planet-nav {
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+        }
+
+        body[data-stage="tree"] .tree-readout {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .fullscreen-button:hover {
+            transform: scale(1.05);
+            color: var(--text);
+            border-color: rgba(247, 234, 209, 0.5);
+        }
+
+        .fullscreen-button svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        #loader {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: grid;
+            place-items: center;
+            background: #020309;
+            transition: opacity 650ms ease;
+        }
+
+        .loader-mark {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: 1px solid rgba(240, 191, 98, 0.22);
+            border-top-color: var(--gold);
+            animation: spin 1100ms linear infinite;
+            box-shadow: 0 0 30px rgba(240, 191, 98, 0.28);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 900px) {
+            .title-block {
+                left: 20px;
+                top: 18px;
+                max-width: calc(100vw - 40px);
+            }
+
+            .planet-readout {
+                left: 20px;
+                right: auto;
+                top: auto;
+                bottom: 104px;
+                width: calc(100vw - 40px);
+                padding: 14px;
+            }
+
+            .tree-readout {
+                left: 20px;
+                right: auto;
+                top: auto;
+                bottom: 104px;
+                width: calc(100vw - 40px);
+                padding: 14px;
+            }
+
+            .mode-switch {
+                top: 18px;
+                left: 50%;
+            }
+
+            .planet-nav {
+                bottom: 14px;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 6px;
+            }
+
+            .planet-button {
+                height: 42px;
+            }
+
+            .nav-label {
+                font-size: 12px;
+            }
+
+            .fullscreen-button {
+                right: 18px;
+                top: 18px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .planet-readout {
+                display: none;
+            }
+
+            .tree-readout {
+                display: none;
+            }
+
+            .planet-nav {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+
+            .planet-button {
+                gap: 6px;
+            }
+
+            .nav-orb {
+                width: 12px;
+                height: 12px;
+            }
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body data-stage="planet">
+    <div id="scene"></div>
+
+    <button class="chrome fullscreen-button" id="fullscreen" aria-label="切换全屏">
+        <svg viewBox="0 0 24 24">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        </svg>
+    </button>
+
+    <div class="chrome mode-switch" id="mode-switch" aria-label="展示模式">
+        <button class="mode-tab" type="button" data-stage="tree">圣诞树</button>
+        <button class="mode-tab active" type="button" data-stage="planet">星球</button>
+    </div>
+
+    <header class="chrome title-block">
+        <div class="eyebrow" id="stage-eyebrow">Particle Solar System</div>
+        <h1 id="stage-title">粒子太阳系</h1>
+    </header>
+
+    <aside class="chrome planet-readout" id="planet-readout">
+        <div class="readout-top">
+            <span class="readout-swatch" id="planet-swatch"></span>
+            <div>
+                <div id="planet-name">土星</div>
+                <div id="planet-en">Saturn</div>
+            </div>
+        </div>
+        <p id="planet-summary">金色冰粒环带和柔和气体层，以粒子轨道呈现。</p>
+        <div class="metrics">
+            <span class="metric">
+                <span class="metric-value" id="metric-orbit">9.58 AU</span>
+                <span class="metric-label">轨道</span>
+            </span>
+            <span class="metric">
+                <span class="metric-value" id="metric-radius">9.45 R⊕</span>
+                <span class="metric-label">半径</span>
+            </span>
+            <span class="metric">
+                <span class="metric-value" id="metric-day">10.7h</span>
+                <span class="metric-label">自转</span>
+            </span>
+        </div>
+    </aside>
+
+    <aside class="chrome tree-readout" id="tree-readout">
+        <div class="readout-top">
+            <span class="readout-swatch tree-swatch"></span>
+            <div>
+                <div id="tree-name">圣诞树</div>
+                <div id="tree-en">Holiday Tree</div>
+            </div>
+        </div>
+        <p id="tree-summary">松绿色枝层、金色灯带和红色饰球各自成型，和星球粒子样式分离。</p>
+        <div class="metrics">
+            <span class="metric">
+                <span class="metric-value">松绿粒子</span>
+                <span class="metric-label">主体</span>
+            </span>
+            <span class="metric">
+                <span class="metric-value">暖金灯带</span>
+                <span class="metric-label">光效</span>
+            </span>
+            <span class="metric">
+                <span class="metric-value">红金饰球</span>
+                <span class="metric-label">点缀</span>
+            </span>
+        </div>
+    </aside>
+
+    <nav class="chrome planet-nav" id="planet-nav" aria-label="太阳系行星"></nav>
+
+    <div id="loader">
+        <div class="loader-mark"></div>
+    </div>
+
+    <script type="module">
+        import * as THREE from "three";
+        import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+        import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+        import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+        const PLANETS = {
+            mercury: {
+                name: "水星",
+                en: "Mercury",
+                color: "#b8aa91",
+                glow: "rgba(184,170,145,0.48)",
+                radius: 2.45,
+                displayScale: 0.92,
+                orbit: "0.39 AU",
+                radiusLabel: "0.38 R⊕",
+                day: "58.6d",
+                summary: "灰褐岩质表面，粒子里保留撞击坑般的明暗斑。",
+                palette: ["#8b8070", "#b8aa91", "#d7c7a4", "#5f5a51"],
+                spin: 0.0014,
+                tilt: 0.03,
+                type: "rock"
+            },
+            venus: {
+                name: "金星",
+                en: "Venus",
+                color: "#e9c985",
+                glow: "rgba(233,201,133,0.55)",
+                radius: 2.75,
+                displayScale: 1.02,
+                orbit: "0.72 AU",
+                radiusLabel: "0.95 R⊕",
+                day: "243d",
+                summary: "浓厚云层形成奶油金色颗粒，边缘带有柔光。",
+                palette: ["#fff1bc", "#e9c985", "#c89b58", "#f6dca0"],
+                spin: -0.0007,
+                tilt: 0.08,
+                type: "cloud"
+            },
+            earth: {
+                name: "地球",
+                en: "Earth",
+                color: "#51a9ff",
+                glow: "rgba(81,169,255,0.52)",
+                radius: 2.85,
+                displayScale: 1.08,
+                orbit: "1.00 AU",
+                radiusLabel: "1.00 R⊕",
+                day: "24h",
+                summary: "蓝色海洋、绿色大陆和白色云带混成发光粒子。",
+                palette: ["#2c8ddb", "#3d9f70", "#e8f4ff", "#1b4f8f", "#b98f5a"],
+                spin: 0.0028,
+                tilt: 0.23,
+                type: "earth"
+            },
+            mars: {
+                name: "火星",
+                en: "Mars",
+                color: "#d96b45",
+                glow: "rgba(217,107,69,0.52)",
+                radius: 2.55,
+                displayScale: 0.96,
+                orbit: "1.52 AU",
+                radiusLabel: "0.53 R⊕",
+                day: "24.6h",
+                summary: "铁锈红与暗色高地交错，整体更干燥、更粗粝。",
+                palette: ["#9d452f", "#d96b45", "#ef9b60", "#5a302a"],
+                spin: 0.0025,
+                tilt: 0.25,
+                type: "rock"
+            },
+            jupiter: {
+                name: "木星",
+                en: "Jupiter",
+                color: "#d8aa72",
+                glow: "rgba(216,170,114,0.58)",
+                radius: 4.55,
+                displayScale: 1.08,
+                orbit: "5.20 AU",
+                radiusLabel: "11.2 R⊕",
+                day: "9.9h",
+                summary: "宽阔云带由米白、赭色和棕色粒子层层绕行。",
+                palette: ["#f0d5a5", "#d8aa72", "#9e6e49", "#f6e6c7", "#724c38"],
+                spin: 0.0032,
+                tilt: 0.04,
+                type: "banded"
+            },
+            saturn: {
+                name: "土星",
+                en: "Saturn",
+                color: "#e5b35e",
+                glow: "rgba(229,179,94,0.62)",
+                radius: 3.75,
+                displayScale: 1,
+                orbit: "9.58 AU",
+                radiusLabel: "9.45 R⊕",
+                day: "10.7h",
+                summary: "金色冰粒环带和柔和气体层，以粒子轨道呈现。",
+                palette: ["#f5d58e", "#e5b35e", "#b88846", "#7b5a32"],
+                spin: 0.0023,
+                tilt: 0.34,
+                type: "saturn",
+                ring: {
+                    inner: 5.1,
+                    outer: 9.7,
+                    tilt: 0.31,
+                    thickness: 0.16,
+                    palette: ["#ffe3a1", "#d8a557", "#86653a", "#45352a"],
+                    opacity: 0.86
+                }
+            },
+            uranus: {
+                name: "天王星",
+                en: "Uranus",
+                color: "#9be5e7",
+                glow: "rgba(155,229,231,0.5)",
+                radius: 3.25,
+                displayScale: 1.02,
+                orbit: "19.2 AU",
+                radiusLabel: "4.01 R⊕",
+                day: "17.2h",
+                summary: "冷青色冰巨星带有近乎竖直的细薄暗环。",
+                palette: ["#c8ffff", "#9be5e7", "#62bcc3", "#e9ffff"],
+                spin: -0.0021,
+                tilt: 1.18,
+                type: "ice",
+                ring: {
+                    inner: 4.35,
+                    outer: 6.25,
+                    tilt: 1.35,
+                    thickness: 0.08,
+                    palette: ["#d7ffff", "#8edce1", "#476e77"],
+                    opacity: 0.42
+                }
+            },
+            neptune: {
+                name: "海王星",
+                en: "Neptune",
+                color: "#4b82ff",
+                glow: "rgba(75,130,255,0.54)",
+                radius: 3.2,
+                displayScale: 1.02,
+                orbit: "30.1 AU",
+                radiusLabel: "3.88 R⊕",
+                day: "16.1h",
+                summary: "深蓝冰巨星，亮蓝粒子中夹着高速风暴暗斑。",
+                palette: ["#173d9b", "#3f76ed", "#7db6ff", "#0f2668"],
+                spin: 0.0022,
+                tilt: 0.28,
+                type: "ice"
+            }
+        };
+
+        const PLANET_ORDER = ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"];
+        const BODY_COUNT = 11800;
+        const RING_COUNT = 8200;
+        const STAR_COUNT = 1900;
+        const clock = new THREE.Clock();
+
+        let scene, camera, renderer, composer;
+        let displayGroup, bodyPoints, ringPoints, starPoints, companionGroup;
+        let bodyPositions, bodyTargets, bodyColors, ringPositions, ringTargets, ringColors;
+        let activePlanetKey = "saturn";
+        let activeStage = "planet";
+        let targetTilt = PLANETS.saturn.tilt;
+        let targetRingOpacity = PLANETS.saturn.ring.opacity;
+        let pointerDown = null;
+        let isDragging = false;
+        let manualRotX = 0.12;
+        let manualRotY = -0.25;
+        const bodySeeds = [];
+        const ringSeeds = [];
+        const companionObjects = [];
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        init();
+
+        function init() {
+            setupThree();
+            setupStars();
+            setupPlanetParticles();
+            setupCompanionPlanets();
+            setupUI();
+            switchStage("planet", true);
+            setupEvents();
+            animate();
+
+            const loader = document.getElementById("loader");
+            requestAnimationFrame(() => {
+                loader.style.opacity = "0";
+                setTimeout(() => { loader.style.display = "none"; }, 700);
+            });
+        }
+
+        function setupThree() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050912, 0.012);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 900);
+            camera.position.set(0, 2.1, 28);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.25;
+            document.getElementById("scene").appendChild(renderer.domElement);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.52, 0.2));
+
+            scene.add(new THREE.AmbientLight(0x8aa4c6, 0.55));
+
+            const keyLight = new THREE.PointLight(0xffd192, 2.8, 90);
+            keyLight.position.set(-10, 8, 12);
+            scene.add(keyLight);
+
+            const blueLight = new THREE.PointLight(0x4fa2ff, 1.4, 120);
+            blueLight.position.set(18, -7, -16);
+            scene.add(blueLight);
+
+            displayGroup = new THREE.Group();
+            scene.add(displayGroup);
+
+            companionGroup = new THREE.Group();
+            scene.add(companionGroup);
+        }
+
+        function setupStars() {
+            const positions = new Float32Array(STAR_COUNT * 3);
+            const colors = new Float32Array(STAR_COUNT * 3);
+            const color = new THREE.Color();
+
+            for (let i = 0; i < STAR_COUNT; i++) {
+                const radius = 90 + Math.random() * 260;
+                const theta = Math.random() * Math.PI * 2;
+                const z = Math.random() * 2 - 1;
+                const root = Math.sqrt(1 - z * z);
+                positions[i * 3] = radius * root * Math.cos(theta);
+                positions[i * 3 + 1] = radius * z * 0.55 + (Math.random() - 0.5) * 20;
+                positions[i * 3 + 2] = radius * root * Math.sin(theta);
+
+                color.setHSL(0.58 + Math.random() * 0.1, 0.35, 0.62 + Math.random() * 0.32);
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.12,
+                map: createParticleTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.72,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            starPoints = new THREE.Points(geometry, material);
+            scene.add(starPoints);
+        }
+
+        function setupPlanetParticles() {
+            bodyPositions = new Float32Array(BODY_COUNT * 3);
+            bodyTargets = new Float32Array(BODY_COUNT * 3);
+            bodyColors = new Float32Array(BODY_COUNT * 3);
+
+            for (let i = 0; i < BODY_COUNT; i++) {
+                bodySeeds.push({
+                    theta: Math.random() * Math.PI * 2,
+                    z: Math.random() * 2 - 1,
+                    shell: Math.pow(Math.random(), 0.42),
+                    band: Math.random(),
+                    noise: Math.random(),
+                    orbit: Math.random() * Math.PI * 2,
+                    speed: 0.55 + Math.random() * 0.65
+                });
+
+                const p = randomScatter(22);
+                bodyPositions[i * 3] = p.x;
+                bodyPositions[i * 3 + 1] = p.y;
+                bodyPositions[i * 3 + 2] = p.z;
+            }
+
+            const bodyGeometry = new THREE.BufferGeometry();
+            bodyGeometry.setAttribute("position", new THREE.BufferAttribute(bodyPositions, 3));
+            bodyGeometry.setAttribute("color", new THREE.BufferAttribute(bodyColors, 3));
+
+            const bodyMaterial = new THREE.PointsMaterial({
+                size: 0.072,
+                map: createParticleTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.95,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            bodyPoints = new THREE.Points(bodyGeometry, bodyMaterial);
+            displayGroup.add(bodyPoints);
+
+            ringPositions = new Float32Array(RING_COUNT * 3);
+            ringTargets = new Float32Array(RING_COUNT * 3);
+            ringColors = new Float32Array(RING_COUNT * 3);
+
+            for (let i = 0; i < RING_COUNT; i++) {
+                ringSeeds.push({
+                    angle: Math.random() * Math.PI * 2,
+                    radius: Math.random(),
+                    band: Math.random(),
+                    height: Math.random() - 0.5,
+                    speed: 0.45 + Math.random() * 0.8,
+                    gap: Math.random()
+                });
+
+                const p = randomScatter(26);
+                ringPositions[i * 3] = p.x;
+                ringPositions[i * 3 + 1] = p.y;
+                ringPositions[i * 3 + 2] = p.z;
+            }
+
+            const ringGeometry = new THREE.BufferGeometry();
+            ringGeometry.setAttribute("position", new THREE.BufferAttribute(ringPositions, 3));
+            ringGeometry.setAttribute("color", new THREE.BufferAttribute(ringColors, 3));
+
+            const ringMaterial = new THREE.PointsMaterial({
+                size: 0.06,
+                map: createParticleTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: targetRingOpacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            ringPoints = new THREE.Points(ringGeometry, ringMaterial);
+            displayGroup.add(ringPoints);
+        }
+
+        function setupCompanionPlanets() {
+            PLANET_ORDER.forEach((key, index) => {
+                const planet = PLANETS[key];
+                const pivot = new THREE.Group();
+                pivot.userData.key = key;
+                pivot.userData.offset = index * 0.78 + Math.random() * 0.2;
+                pivot.userData.speed = 0.055 + index * 0.008;
+                pivot.userData.orbitRadius = 14.5 + index * 1.15;
+
+                const body = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.28 + planet.radius * 0.055, 24, 16),
+                    new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(planet.color),
+                        roughness: 0.72,
+                        metalness: 0.05,
+                        emissive: new THREE.Color(planet.color),
+                        emissiveIntensity: 0.12
+                    })
+                );
+                body.userData.key = key;
+                pivot.add(body);
+                companionObjects.push(body);
+
+                if (planet.ring) {
+                    const ring = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.55 + planet.radius * 0.07, 0.018, 8, 72),
+                        new THREE.MeshBasicMaterial({
+                            color: new THREE.Color(planet.ring.palette[0]),
+                            transparent: true,
+                            opacity: 0.58
+                        })
+                    );
+                    ring.rotation.x = Math.PI / 2 + planet.ring.tilt;
+                    pivot.add(ring);
+                }
+
+                companionGroup.add(pivot);
+            });
+        }
+
+        function setupUI() {
+            const nav = document.getElementById("planet-nav");
+
+            PLANET_ORDER.forEach((key) => {
+                const planet = PLANETS[key];
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "planet-button";
+                button.dataset.planet = key;
+                button.style.setProperty("--planet-color", planet.color);
+                button.innerHTML = `<span class="nav-orb"></span><span class="nav-label">${planet.name}</span>`;
+                button.addEventListener("click", () => switchPlanet(key));
+                nav.appendChild(button);
+            });
+
+            document.querySelectorAll(".mode-tab").forEach((button) => {
+                button.addEventListener("click", () => switchStage(button.dataset.stage));
+            });
+
+            document.getElementById("fullscreen").addEventListener("click", () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+        }
+
+        function setupEvents() {
+            window.addEventListener("resize", () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                composer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            window.addEventListener("pointerdown", (event) => {
+                if (event.target.closest(".chrome")) return;
+                pointerDown = { x: event.clientX, y: event.clientY };
+                isDragging = false;
+            });
+
+            window.addEventListener("pointermove", (event) => {
+                if (!pointerDown) return;
+                const dx = event.clientX - pointerDown.x;
+                const dy = event.clientY - pointerDown.y;
+                if (Math.abs(dx) + Math.abs(dy) > 4) isDragging = true;
+                manualRotY += dx * 0.0009;
+                manualRotX += dy * 0.0006;
+                manualRotX = THREE.MathUtils.clamp(manualRotX, -0.48, 0.62);
+                pointerDown = { x: event.clientX, y: event.clientY };
+            });
+
+            window.addEventListener("pointerup", (event) => {
+                if (!isDragging) {
+                    const key = pickCompanion(event);
+                    if (key) switchPlanet(key);
+                }
+                pointerDown = null;
+                isDragging = false;
+            });
+
+            window.addEventListener("keydown", (event) => {
+                if (event.key.toLowerCase() === "t") {
+                    switchStage("tree");
+                    return;
+                }
+                if (event.key.toLowerCase() === "p") {
+                    switchStage("planet");
+                    return;
+                }
+
+                const index = Number(event.key) - 1;
+                if (index >= 0 && index < PLANET_ORDER.length) {
+                    switchPlanet(PLANET_ORDER[index]);
+                }
+            });
+        }
+
+        function switchStage(stage, immediate = false) {
+            if (stage !== "tree" && stage !== "planet") return;
+            activeStage = stage;
+            updateStageUI();
+
+            if (stage === "tree") {
+                targetTilt = -0.08;
+                targetRingOpacity = 0.94;
+                document.documentElement.style.setProperty("--active-planet", "#67de99");
+                document.documentElement.style.setProperty("--active-glow", "rgba(103,222,153,0.42)");
+                setTreeTargets();
+            } else {
+                const planet = PLANETS[activePlanetKey];
+                targetTilt = planet.tilt;
+                targetRingOpacity = planet.ring ? planet.ring.opacity : 0;
+                document.documentElement.style.setProperty("--active-planet", planet.color);
+                document.documentElement.style.setProperty("--active-glow", planet.glow);
+                setBodyTargets(planet);
+                setRingTargets(planet);
+                updateReadout(planet, activePlanetKey);
+            }
+
+            if (immediate) {
+                bodyPositions.set(bodyTargets);
+                ringPositions.set(ringTargets);
+                bodyPoints.geometry.attributes.position.needsUpdate = true;
+                ringPoints.geometry.attributes.position.needsUpdate = true;
+                ringPoints.material.opacity = targetRingOpacity;
+                displayGroup.rotation.x = manualRotX + targetTilt;
+            }
+        }
+
+        function updateStageUI() {
+            document.body.dataset.stage = activeStage;
+            document.getElementById("stage-eyebrow").textContent = activeStage === "tree" ? "Holiday Particle Tree" : "Particle Solar System";
+            document.getElementById("stage-title").textContent = activeStage === "tree" ? "粒子圣诞树" : "粒子太阳系";
+            document.querySelectorAll(".mode-tab").forEach((button) => {
+                button.classList.toggle("active", button.dataset.stage === activeStage);
+            });
+        }
+
+        function switchPlanet(key, immediate = false) {
+            const planet = PLANETS[key];
+            if (!planet) return;
+
+            activePlanetKey = key;
+            activeStage = "planet";
+            updateStageUI();
+            targetTilt = planet.tilt;
+            targetRingOpacity = planet.ring ? planet.ring.opacity : 0;
+            document.documentElement.style.setProperty("--active-planet", planet.color);
+            document.documentElement.style.setProperty("--active-glow", planet.glow);
+
+            setBodyTargets(planet);
+            setRingTargets(planet);
+            updateReadout(planet, key);
+
+            if (immediate) {
+                bodyPositions.set(bodyTargets);
+                ringPositions.set(ringTargets);
+                bodyPoints.geometry.attributes.position.needsUpdate = true;
+                ringPoints.geometry.attributes.position.needsUpdate = true;
+                ringPoints.material.opacity = targetRingOpacity;
+                displayGroup.rotation.x = manualRotX + targetTilt;
+            }
+        }
+
+        function updateReadout(planet, key) {
+            document.getElementById("planet-name").textContent = planet.name;
+            document.getElementById("planet-en").textContent = planet.en;
+            document.getElementById("planet-summary").textContent = planet.summary;
+            document.getElementById("metric-orbit").textContent = planet.orbit;
+            document.getElementById("metric-radius").textContent = planet.radiusLabel;
+            document.getElementById("metric-day").textContent = planet.day;
+            document.getElementById("planet-swatch").style.background = planet.color;
+
+            document.querySelectorAll(".planet-button").forEach((button) => {
+                button.classList.toggle("active", button.dataset.planet === key);
+            });
+        }
+
+        function setBodyTargets(planet) {
+            const color = new THREE.Color();
+            const radius = planet.radius * planet.displayScale;
+
+            for (let i = 0; i < BODY_COUNT; i++) {
+                const seed = bodySeeds[i];
+                const root = Math.sqrt(1 - seed.z * seed.z);
+                const theta = seed.theta + seed.orbit * 0.03;
+                const shell = radius * (0.55 + 0.45 * seed.shell);
+                let x = shell * root * Math.cos(theta);
+                let y = shell * seed.z;
+                let z = shell * root * Math.sin(theta);
+
+                if (planet.type === "banded" || planet.type === "saturn") {
+                    const band = Math.sin(seed.z * Math.PI * 10.5);
+                    x *= 1 + band * 0.012;
+                    z *= 1 + band * 0.012;
+                }
+
+                if (planet.type === "ice") {
+                    y *= 0.97;
+                }
+
+                bodyTargets[i * 3] = x;
+                bodyTargets[i * 3 + 1] = y;
+                bodyTargets[i * 3 + 2] = z;
+
+                color.set(pickBodyColor(planet, seed));
+                bodyColors[i * 3] = color.r;
+                bodyColors[i * 3 + 1] = color.g;
+                bodyColors[i * 3 + 2] = color.b;
+            }
+
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function pickBodyColor(planet, seed) {
+            const lat = Math.abs(seed.z);
+            const band = Math.floor((seed.z + 1) * 8 + seed.noise * 2) % planet.palette.length;
+
+            if (planet.type === "earth") {
+                if (lat > 0.78 || seed.noise > 0.93) return "#e8f4ff";
+                if (Math.sin(seed.theta * 2.7 + seed.z * 7.2) + seed.noise * 0.9 > 0.72) return "#3d9f70";
+                if (Math.cos(seed.theta * 3.4 - seed.z * 5.5) + seed.noise > 1.12) return "#b98f5a";
+                return seed.noise > 0.22 ? "#2c8ddb" : "#1b4f8f";
+            }
+
+            if (planet.type === "banded") {
+                const stripe = Math.floor((seed.z + 1) * 14);
+                return planet.palette[(stripe + (seed.noise > 0.72 ? 1 : 0)) % planet.palette.length];
+            }
+
+            if (planet.type === "saturn") {
+                const stripe = Math.floor((seed.z + 1) * 12);
+                return planet.palette[(stripe + (seed.noise > 0.84 ? 1 : 0)) % planet.palette.length];
+            }
+
+            if (planet.type === "cloud") {
+                return seed.noise > 0.72 ? planet.palette[0] : planet.palette[band];
+            }
+
+            if (planet.type === "rock") {
+                return seed.noise > 0.88 ? planet.palette[3] : planet.palette[band];
+            }
+
+            if (planet.type === "ice") {
+                return seed.noise > 0.82 ? planet.palette[0] : planet.palette[band];
+            }
+
+            return planet.palette[band];
+        }
+
+        function setRingTargets(planet) {
+            const color = new THREE.Color();
+            const hasRing = Boolean(planet.ring);
+            const ring = planet.ring || {
+                inner: planet.radius * 0.95,
+                outer: planet.radius * 1.05,
+                thickness: 0.03,
+                palette: planet.palette,
+                tilt: 0
+            };
+
+            for (let i = 0; i < RING_COUNT; i++) {
+                const seed = ringSeeds[i];
+                const radiusSeed = Math.pow(seed.radius, 0.58);
+                let radius = ring.inner + (ring.outer - ring.inner) * radiusSeed;
+                const angle = seed.angle;
+                let alphaGap = 1;
+
+                if (hasRing && planet.en === "Saturn") {
+                    const normalized = (radius - ring.inner) / (ring.outer - ring.inner);
+                    if (normalized > 0.45 && normalized < 0.55 && seed.gap < 0.72) {
+                        radius += 0.55;
+                        alphaGap = 0.36;
+                    }
+                    if (normalized > 0.78 && seed.gap < 0.5) alphaGap = 0.55;
+                }
+
+                if (!hasRing) {
+                    radius = planet.radius * (1.3 + seed.radius * 0.22);
+                }
+
+                ringTargets[i * 3] = radius * Math.cos(angle);
+                ringTargets[i * 3 + 1] = seed.height * ring.thickness * (hasRing ? 1 : 0.2);
+                ringTargets[i * 3 + 2] = radius * Math.sin(angle);
+
+                const palette = ring.palette;
+                const c = palette[Math.floor(seed.band * palette.length) % palette.length];
+                color.set(c);
+                color.multiplyScalar(hasRing ? alphaGap : 0.25);
+                ringColors[i * 3] = color.r;
+                ringColors[i * 3 + 1] = color.g;
+                ringColors[i * 3 + 2] = color.b;
+            }
+
+            ringPoints.rotation.x = ring.tilt;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function setTreeTargets() {
+            const color = new THREE.Color();
+            const treePalette = ["#2fa667", "#3fc77a", "#79efaa", "#d9b35f", "#f7e6a6"];
+            const ornamentPalette = ["#f0bf62", "#fff1b8", "#c63f36", "#e76f51", "#6fd6ff"];
+
+            for (let i = 0; i < BODY_COUNT; i++) {
+                const seed = bodySeeds[i];
+                const trunkCount = 760;
+                const topperCount = 360;
+
+                if (i < trunkCount) {
+                    const t = i / trunkCount;
+                    const angle = seed.theta;
+                    const r = 0.32 + seed.shell * 0.42;
+                    bodyTargets[i * 3] = Math.cos(angle) * r;
+                    bodyTargets[i * 3 + 1] = -7.4 + t * 2.1;
+                    bodyTargets[i * 3 + 2] = Math.sin(angle) * r;
+                    color.set(seed.noise > 0.42 ? "#7a4a2a" : "#b17638");
+                } else if (i > BODY_COUNT - topperCount) {
+                    const t = (i - (BODY_COUNT - topperCount)) / topperCount;
+                    const angle = seed.theta;
+                    const point = Math.floor(t * 5);
+                    const spoke = point * Math.PI * 0.4 - Math.PI / 2;
+                    const starRadius = (seed.shell * 0.9 + 0.18) * (seed.noise > 0.45 ? 1.0 : 0.46);
+                    bodyTargets[i * 3] = Math.cos(spoke + angle * 0.08) * starRadius;
+                    bodyTargets[i * 3 + 1] = 7.25 + Math.sin(spoke + angle * 0.08) * starRadius * 0.75;
+                    bodyTargets[i * 3 + 2] = (seed.noise - 0.5) * 0.34;
+                    color.set(seed.noise > 0.34 ? "#fff1b8" : "#f0bf62");
+                } else {
+                    const t = (i - trunkCount) / (BODY_COUNT - trunkCount - topperCount);
+                    const y = -5.85 + t * 12.1;
+                    const cone = Math.max(0.04, 1 - t);
+                    const branchStep = Math.floor(t * 11);
+                    const branchWave = 0.82 + 0.18 * Math.sin(branchStep * 2.2 + seed.theta * 3);
+                    const r = (0.42 + seed.shell * 0.72) * 5.85 * Math.pow(cone, 0.78) * branchWave;
+                    const angle = seed.theta + t * Math.PI * 17.6;
+                    bodyTargets[i * 3] = Math.cos(angle) * r;
+                    bodyTargets[i * 3 + 1] = y + Math.sin(seed.theta * 4.0) * 0.16;
+                    bodyTargets[i * 3 + 2] = Math.sin(angle) * r;
+
+                    const paletteIndex = Math.floor(seed.noise * treePalette.length) % treePalette.length;
+                    color.set(seed.noise > 0.86 ? "#f7e6a6" : treePalette[paletteIndex]);
+                }
+
+                bodyColors[i * 3] = color.r;
+                bodyColors[i * 3 + 1] = color.g;
+                bodyColors[i * 3 + 2] = color.b;
+            }
+
+            for (let i = 0; i < RING_COUNT; i++) {
+                const seed = ringSeeds[i];
+                const band = seed.radius;
+                let x, y, z;
+
+                if (i < 540) {
+                    const point = Math.floor(seed.band * 5);
+                    const spoke = point * Math.PI * 0.4 - Math.PI / 2;
+                    const r = 0.24 + seed.radius * 1.14;
+                    x = Math.cos(spoke + seed.angle * 0.05) * r;
+                    y = 7.28 + Math.sin(spoke + seed.angle * 0.05) * r * 0.72;
+                    z = seed.height * 0.32;
+                    color.set(seed.gap > 0.38 ? "#fff6cc" : "#f0bf62");
+                } else if (seed.gap < 0.68) {
+                    const yNorm = band;
+                    y = -5.62 + yNorm * 11.4;
+                    const cone = Math.max(0.06, 1 - yNorm);
+                    const r = 5.95 * Math.pow(cone, 0.8) + 0.16;
+                    const angle = yNorm * Math.PI * 13.2 + seed.angle * 0.18;
+                    x = Math.cos(angle) * r;
+                    z = Math.sin(angle) * r;
+                    color.set(seed.gap > 0.78 ? "#fff1b8" : "#f0bf62");
+                } else {
+                    const yNorm = seed.band;
+                    y = -5.15 + yNorm * 10.65;
+                    const cone = Math.max(0.09, 1 - yNorm);
+                    const r = (4.95 * Math.pow(cone, 0.82)) * (0.82 + seed.radius * 0.2);
+                    const angle = seed.angle + yNorm * Math.PI * 2.2;
+                    x = Math.cos(angle) * r;
+                    z = Math.sin(angle) * r;
+                    color.set(ornamentPalette[Math.floor(seed.gap * ornamentPalette.length) % ornamentPalette.length]);
+                }
+
+                ringTargets[i * 3] = x;
+                ringTargets[i * 3 + 1] = y;
+                ringTargets[i * 3 + 2] = z;
+                ringColors[i * 3] = color.r;
+                ringColors[i * 3 + 1] = color.g;
+                ringColors[i * 3 + 2] = color.b;
+            }
+
+            ringPoints.rotation.x = 0;
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+            const planet = PLANETS[activePlanetKey];
+
+            moveAttribute(bodyPositions, bodyTargets, 0.045);
+            moveAttribute(ringPositions, ringTargets, 0.052);
+            bodyPoints.geometry.attributes.position.needsUpdate = true;
+            ringPoints.geometry.attributes.position.needsUpdate = true;
+
+            bodyPoints.rotation.y += activeStage === "planet" ? planet.spin : 0.0011;
+            ringPoints.rotation.z += activeStage === "planet" ? (planet.ring ? 0.0009 : 0.0002) : 0.0017;
+            bodyPoints.material.size = THREE.MathUtils.lerp(bodyPoints.material.size, activeStage === "tree" ? 0.096 : 0.072, 0.08);
+            ringPoints.material.size = THREE.MathUtils.lerp(ringPoints.material.size, activeStage === "tree" ? 0.076 : 0.06, 0.08);
+            ringPoints.material.opacity = THREE.MathUtils.lerp(ringPoints.material.opacity, targetRingOpacity, 0.06);
+            displayGroup.scale.setScalar(THREE.MathUtils.lerp(displayGroup.scale.x, activeStage === "tree" ? 1.12 : 1, 0.06));
+
+            manualRotY += activeStage === "planet" ? 0.0016 : 0.0012;
+            displayGroup.rotation.y = THREE.MathUtils.lerp(displayGroup.rotation.y, manualRotY, 0.035);
+            displayGroup.rotation.x = THREE.MathUtils.lerp(displayGroup.rotation.x, manualRotX + targetTilt, 0.035);
+
+            updateCompanions(time);
+            starPoints.rotation.y += 0.00008;
+
+            composer.passes[1].strength = activeStage === "tree" ? 0.78 : (planet.ring ? 0.72 : 0.48);
+            composer.render();
+        }
+
+        function updateCompanions(time) {
+            companionGroup.children.forEach((pivot, index) => {
+                const key = pivot.userData.key;
+                const planet = PLANETS[key];
+                const hidden = activeStage !== "planet" || key === activePlanetKey;
+                const angle = time * pivot.userData.speed + pivot.userData.offset;
+                const radius = pivot.userData.orbitRadius;
+                pivot.visible = !hidden;
+                pivot.position.set(
+                    radius * Math.cos(angle),
+                    -3.8 + Math.sin(angle * 1.7 + index) * 2.3,
+                    radius * Math.sin(angle) - 5
+                );
+                const scale = key === "jupiter" || key === "saturn" ? 1.18 : 1;
+                pivot.scale.setScalar(scale);
+                pivot.rotation.y += planet.spin * 1.8;
+            });
+        }
+
+        function moveAttribute(current, target, ease) {
+            for (let i = 0; i < current.length; i++) {
+                current[i] += (target[i] - current[i]) * ease;
+            }
+        }
+
+        function pickCompanion(event) {
+            if (activeStage !== "planet") return null;
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(companionObjects, true);
+            if (!hits.length) return null;
+            return hits[0].object.userData.key;
+        }
+
+        function createParticleTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext("2d");
+            const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, "rgba(255,255,255,1)");
+            gradient.addColorStop(0.35, "rgba(255,255,255,0.78)");
+            gradient.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function randomScatter(radius) {
+            const theta = Math.random() * Math.PI * 2;
+            const z = Math.random() * 2 - 1;
+            const root = Math.sqrt(1 - z * z);
+            const r = radius * Math.pow(Math.random(), 0.35);
+            return {
+                x: r * root * Math.cos(theta),
+                y: r * z,
+                z: r * root * Math.sin(theta)
+            };
+        }
+    </script>
+</body>
+</html>
