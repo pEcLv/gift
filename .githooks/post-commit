@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+set -u
+
+if [ "${AUTO_GIT_SYNC_SKIP_POST_COMMIT_PUSH:-}" = "1" ]; then
+    exit 0
+fi
+
+remote="${AUTO_GIT_SYNC_REMOTE:-origin}"
+branch="$(git branch --show-current 2>/dev/null || true)"
+
+if [ -z "$branch" ]; then
+    echo "post-commit: detached HEAD; skipping push" >&2
+    exit 0
+fi
+
+if ! git config "remote.${remote}.url" >/dev/null 2>&1; then
+    echo "post-commit: remote '${remote}' not found; skipping push" >&2
+    exit 0
+fi
+
+if git rev-parse --abbrev-ref --symbolic-full-name "@{u}" >/dev/null 2>&1; then
+    git push
+else
+    git push -u "$remote" "$branch"
+fi
