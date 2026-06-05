@@ -94,7 +94,7 @@
 </head>
 <body>
     <iframe class="scene-frame" data-scene="tree" src="christmas_tree_scene.html" title="粒子圣诞树"></iframe>
-    <iframe class="scene-frame" data-scene="planet" src="solar_system.html?embed=1" title="粒子太阳系"></iframe>
+    <iframe class="scene-frame" data-scene="planet" src="solar_system.html?embed=1" title="粒子太阳系" allow="camera; fullscreen"></iframe>
 
     <nav class="global-switch" aria-label="主场景切换">
         <button class="switch-button" type="button" data-scene="tree">圣诞树</button>
@@ -103,7 +103,8 @@
 
     <script>
         const params = new URLSearchParams(window.location.search);
-        const defaultScene = params.get("scene") === "planet" ? "planet" : "tree";
+        const requestedScene = params.get("scene");
+        const defaultScene = ["tree", "planet"].includes(requestedScene) ? requestedScene : "tree";
 
         function switchScene(scene) {
             document.querySelectorAll(".scene-frame").forEach((frame) => {

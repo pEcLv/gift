@@ -15,6 +15,7 @@
             --muted: rgba(247, 234, 209, 0.62);
             --blue: #86d6ff;
             --red: #ff7f58;
+            --green: #67de99;
         }
 
         * {
@@ -338,6 +339,155 @@
             fill: currentColor;
         }
 
+        .gesture-panel {
+            right: 34px;
+            top: 252px;
+            width: 292px;
+            padding: 12px;
+            border: 1px solid rgba(134, 214, 255, 0.26);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(7, 12, 20, 0.82), rgba(4, 6, 12, 0.62));
+            backdrop-filter: blur(18px);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34), inset 0 0 28px rgba(75, 162, 255, 0.06);
+            transition: opacity 240ms ease, transform 240ms ease;
+        }
+
+        .video-shell {
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            border: 1px solid rgba(247, 234, 209, 0.14);
+            border-radius: 6px;
+            background: rgba(2, 3, 7, 0.86);
+        }
+
+        #camera-preview,
+        #hand-overlay {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #camera-preview {
+            object-fit: cover;
+            transform: scaleX(-1);
+            opacity: 0.72;
+        }
+
+        #hand-overlay {
+            transform: scaleX(-1);
+        }
+
+        .video-empty {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            padding: 16px;
+            color: rgba(247, 234, 209, 0.66);
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        body.camera-on .video-empty {
+            display: none;
+        }
+
+        .gesture-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .gesture-button {
+            flex: 1 1 auto;
+            height: 36px;
+            border: 1px solid rgba(134, 214, 255, 0.5);
+            border-radius: 6px;
+            background: rgba(134, 214, 255, 0.12);
+            color: var(--text);
+            font: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease;
+        }
+
+        .gesture-button:hover {
+            color: #fff;
+            border-color: rgba(247, 234, 209, 0.48);
+            transform: translateY(-1px);
+        }
+
+        .gesture-button:disabled {
+            cursor: default;
+            opacity: 0.72;
+            transform: none;
+        }
+
+        .gesture-readout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .gesture-cell {
+            min-width: 0;
+            border-top: 1px solid rgba(134, 214, 255, 0.2);
+            padding-top: 8px;
+        }
+
+        .gesture-value {
+            display: block;
+            color: var(--text);
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .gesture-label {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+        }
+
+        .gesture-map {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .gesture-token {
+            min-width: 0;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(247, 234, 209, 0.12);
+            border-radius: 6px;
+            background: rgba(247, 234, 209, 0.035);
+            color: rgba(247, 234, 209, 0.62);
+            font-size: 12px;
+            transition: color 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+        }
+
+        .gesture-token.active {
+            color: var(--text);
+            border-color: var(--token-color, var(--blue));
+            background: color-mix(in srgb, var(--token-color, var(--blue)) 14%, transparent);
+            box-shadow: inset 0 0 18px color-mix(in srgb, var(--token-color, var(--blue)) 18%, transparent);
+        }
+
+        body[data-stage="tree"] .gesture-panel {
+            opacity: 0.42;
+        }
+
         #loader {
             position: fixed;
             inset: 0;
@@ -410,6 +560,12 @@
                 right: 18px;
                 top: 18px;
             }
+
+            .gesture-panel {
+                right: 18px;
+                top: 70px;
+                width: 250px;
+            }
         }
 
         @media (max-width: 520px) {
@@ -433,6 +589,18 @@
                 width: 12px;
                 height: 12px;
             }
+
+            .gesture-panel {
+                left: 18px;
+                right: 18px;
+                top: auto;
+                bottom: 104px;
+                width: auto;
+            }
+
+            .video-shell {
+                display: none;
+            }
         }
     </style>
     <script type="importmap">
@@ -443,6 +611,7 @@
             }
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" defer></script>
 </head>
 <body data-stage="planet">
     <div id="scene"></div>
@@ -514,6 +683,35 @@
     </aside>
 
     <nav class="chrome planet-nav" id="planet-nav" aria-label="太阳系行星"></nav>
+
+    <section class="chrome gesture-panel" aria-label="摄像头手势控制">
+        <div class="video-shell">
+            <video id="camera-preview" playsinline muted></video>
+            <canvas id="hand-overlay"></canvas>
+            <div class="video-empty" id="video-empty">启动摄像头后，手势会作为鼠标和按钮之外的附加控制方式。</div>
+        </div>
+        <div class="gesture-actions">
+            <button class="gesture-button" type="button" id="start-gesture">启动手势控制</button>
+        </div>
+        <div class="gesture-readout">
+            <span class="gesture-cell">
+                <span class="gesture-value" id="gesture-state">等待手势</span>
+                <span class="gesture-label">Gesture</span>
+            </span>
+            <span class="gesture-cell">
+                <span class="gesture-value" id="camera-distance">视距 28.0</span>
+                <span class="gesture-label">Camera</span>
+            </span>
+        </div>
+        <div class="gesture-map" aria-label="手势映射">
+            <span class="gesture-token" data-gesture="pinch" style="--token-color: var(--blue)">捏住</span>
+            <span class="gesture-token" data-gesture="pointLeft" style="--token-color: var(--gold)">向左</span>
+            <span class="gesture-token" data-gesture="pointRight" style="--token-color: var(--gold)">向右</span>
+            <span class="gesture-token" data-gesture="fist" style="--token-color: var(--red)">握拳</span>
+            <span class="gesture-token" data-gesture="open" style="--token-color: var(--green)">张掌</span>
+            <span class="gesture-token" data-gesture="twoHand" style="--token-color: var(--blue)">双手</span>
+        </div>
+    </section>
 
     <div id="loader">
         <div class="loader-mark"></div>
@@ -694,11 +892,31 @@
         let isDragging = false;
         let manualRotX = 0.12;
         let manualRotY = -0.25;
+        let cameraDistance = 28;
+        let targetCameraDistance = 28;
+        let gestureSpread = 0;
+        let targetGestureSpread = 0;
+        let lastFrameTime = 0;
         const bodySeeds = [];
         const ringSeeds = [];
         const companionObjects = [];
         const raycaster = new THREE.Raycaster();
         const pointer = new THREE.Vector2();
+        const cameraPreview = document.getElementById("camera-preview");
+        const handOverlay = document.getElementById("hand-overlay");
+        const handOverlayContext = handOverlay.getContext("2d");
+        const gestureButton = document.getElementById("start-gesture");
+        const gestureState = document.getElementById("gesture-state");
+        const cameraDistanceLabel = document.getElementById("camera-distance");
+        const gestureControl = {
+            mode: "idle",
+            previousPinchCenter: null,
+            pinchLocked: false,
+            pendingDirection: null,
+            pendingSince: 0,
+            lastSwitchAt: 0,
+            lastSeen: 0
+        };
 
         init();
 
@@ -724,7 +942,7 @@
             scene.fog = new THREE.FogExp2(0x050912, 0.012);
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 900);
-            camera.position.set(0, 2.1, 28);
+            camera.position.set(0, 2.1, cameraDistance);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -938,6 +1156,8 @@
                     document.exitFullscreen();
                 }
             });
+
+            gestureButton.addEventListener("click", startGestureControl);
         }
 
         function setupEvents() {
@@ -946,6 +1166,7 @@
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 composer.setSize(window.innerWidth, window.innerHeight);
+                resizeHandOverlay();
             });
 
             window.addEventListener("pointerdown", (event) => {
@@ -989,6 +1210,340 @@
                     switchPlanet(PLANET_ORDER[index]);
                 }
             });
+
+            window.addEventListener("wheel", (event) => {
+                if (event.target.closest(".chrome")) return;
+                targetCameraDistance = THREE.MathUtils.clamp(targetCameraDistance + event.deltaY * 0.012, 16, 44);
+            }, { passive: true });
+        }
+
+        async function startGestureControl() {
+            if (!navigator.mediaDevices?.getUserMedia) {
+                setGestureMessage("当前浏览器不支持摄像头");
+                return;
+            }
+
+            if (!window.Hands) {
+                setGestureMessage("手势库未加载");
+                return;
+            }
+
+            gestureButton.disabled = true;
+            gestureButton.textContent = "启动中";
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 960 },
+                        height: { ideal: 540 },
+                        facingMode: "user"
+                    },
+                    audio: false
+                });
+
+                cameraPreview.srcObject = stream;
+                await cameraPreview.play();
+                document.body.classList.add("camera-on");
+                resizeHandOverlay();
+
+                const hands = new window.Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                });
+                hands.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.72,
+                    minTrackingConfidence: 0.72
+                });
+                hands.onResults(handleHandResults);
+
+                gestureButton.textContent = "手势运行中";
+                runHandLoop(hands);
+            } catch (error) {
+                gestureButton.disabled = false;
+                gestureButton.textContent = "启动手势控制";
+                setGestureMessage(error?.message || "摄像头启动失败");
+            }
+        }
+
+        async function runHandLoop(hands) {
+            let busy = false;
+            const tick = async () => {
+                if (cameraPreview.readyState >= 2 && !busy) {
+                    busy = true;
+                    try {
+                        await hands.send({ image: cameraPreview });
+                    } catch {
+                        setGestureMessage("手势识别暂停");
+                    } finally {
+                        busy = false;
+                    }
+                }
+                requestAnimationFrame(tick);
+            };
+            tick();
+        }
+
+        function handleHandResults(results) {
+            resizeHandOverlay();
+            const hands = results.multiHandLandmarks || [];
+            const landmarks = hands[0];
+            drawHandOverlay(hands);
+
+            if (!landmarks) {
+                if (performance.now() - gestureControl.lastSeen > 350) {
+                    setGestureMode("idle", "未检测到手");
+                    gestureControl.previousPinchCenter = null;
+                    gestureControl.pendingDirection = null;
+                }
+                return;
+            }
+
+            gestureControl.lastSeen = performance.now();
+
+            if (hands.length >= 2) {
+                applyTwoHandGesture(analyzeTwoHands(hands[0], hands[1]));
+                return;
+            }
+
+            applyGestureAnalysis(analyzeHand(landmarks));
+        }
+
+        function analyzeHand(landmarks) {
+            const point = (index) => {
+                const landmark = landmarks[index];
+                return { x: 1 - landmark.x, y: landmark.y, z: landmark.z };
+            };
+            const wrist = point(0);
+            const indexMcp = point(5);
+            const middleMcp = point(9);
+            const ringMcp = point(13);
+            const pinkyMcp = point(17);
+            const palmCenter = {
+                x: (wrist.x + indexMcp.x + middleMcp.x + ringMcp.x + pinkyMcp.x) / 5,
+                y: (wrist.y + indexMcp.y + middleMcp.y + ringMcp.y + pinkyMcp.y) / 5
+            };
+            const palmSpan = Math.max(distance2D(indexMcp, pinkyMcp), distance2D(wrist, middleMcp) * 0.74, 0.045);
+
+            const extended = {
+                index: isFingerExtended(point(8), point(6), point(5), palmCenter, palmSpan),
+                middle: isFingerExtended(point(12), point(10), point(9), palmCenter, palmSpan),
+                ring: isFingerExtended(point(16), point(14), point(13), palmCenter, palmSpan),
+                pinky: isFingerExtended(point(20), point(18), point(17), palmCenter, palmSpan)
+            };
+            const thumbReach = distance2D(point(4), palmCenter) / palmSpan;
+            const pinchDistance = distance2D(point(4), point(8)) / palmSpan;
+            const pinchThreshold = gestureControl.pinchLocked ? 0.64 : 0.48;
+            const pinch = pinchDistance < pinchThreshold;
+            gestureControl.pinchLocked = pinch;
+
+            const openFingerCount = ["index", "middle", "ring", "pinky"].filter((key) => extended[key]).length;
+            const indexVector = normalize2D({
+                x: point(8).x - point(5).x,
+                y: point(8).y - point(5).y
+            });
+
+            return {
+                pinch,
+                palmCenter,
+                indexVector,
+                isSingleIndex: extended.index && !extended.middle && !extended.ring && !extended.pinky,
+                isFist: openFingerCount === 0 && thumbReach < 1.05 && !pinch,
+                isOpen: openFingerCount >= 4 && !pinch
+            };
+        }
+
+        function analyzeTwoHands(firstHand, secondHand) {
+            const first = getPalmMetrics(firstHand);
+            const second = getPalmMetrics(secondHand);
+            const span = Math.max((first.palmSpan + second.palmSpan) * 0.5, 0.045);
+            const gap = distance2D(first.palmCenter, second.palmCenter) / span;
+            const spread = THREE.MathUtils.clamp((gap - 2.15) / 4.4, 0, 1);
+            return { spread };
+        }
+
+        function applyTwoHandGesture(analysis) {
+            resetDirectionHold();
+            gestureControl.previousPinchCenter = null;
+            targetGestureSpread = activeStage === "planet" ? analysis.spread : 0;
+            setGestureMode("twoHand", analysis.spread > 0.45 ? "双手分开：粒子扩散" : "双手靠近：粒子合并");
+        }
+
+        function applyGestureAnalysis(analysis) {
+            const now = performance.now();
+
+            if (analysis.pinch) {
+                setGestureMode("pinch", "捏住：调整视角");
+                if (gestureControl.previousPinchCenter) {
+                    const dx = analysis.palmCenter.x - gestureControl.previousPinchCenter.x;
+                    const dy = analysis.palmCenter.y - gestureControl.previousPinchCenter.y;
+                    manualRotY += dx * 3.45;
+                    manualRotX += dy * 2.6;
+                    manualRotX = THREE.MathUtils.clamp(manualRotX, -0.48, 0.62);
+                }
+                gestureControl.previousPinchCenter = analysis.palmCenter;
+                resetDirectionHold();
+                return;
+            }
+
+            gestureControl.previousPinchCenter = null;
+
+            if (analysis.isSingleIndex) {
+                const horizontal = Math.abs(analysis.indexVector.x);
+                const direction = horizontal > 0.54 && horizontal > Math.abs(analysis.indexVector.y) * 1.08
+                    ? Math.sign(analysis.indexVector.x)
+                    : 0;
+
+                if (direction !== 0) {
+                    setGestureMode(direction < 0 ? "pointLeft" : "pointRight", direction < 0 ? "指向左：上一个星球" : "指向右：下一个星球");
+                    holdDirection(direction, now);
+                    return;
+                }
+            }
+
+            resetDirectionHold();
+
+            if (analysis.isFist) {
+                setGestureMode("fist", "握拳：放大视角");
+                return;
+            }
+
+            if (analysis.isOpen) {
+                setGestureMode("open", "张掌：缩小视角");
+                return;
+            }
+
+            setGestureMode("tracking", "跟踪中");
+        }
+
+        function holdDirection(direction, now) {
+            if (gestureControl.pendingDirection !== direction) {
+                gestureControl.pendingDirection = direction;
+                gestureControl.pendingSince = now;
+                return;
+            }
+
+            if (now - gestureControl.pendingSince > 250 && now - gestureControl.lastSwitchAt > 780) {
+                switchRelativePlanet(direction);
+                gestureControl.lastSwitchAt = now;
+                gestureControl.pendingSince = now + 420;
+            }
+        }
+
+        function resetDirectionHold() {
+            gestureControl.pendingDirection = null;
+            gestureControl.pendingSince = 0;
+        }
+
+        function switchRelativePlanet(direction) {
+            const currentIndex = PLANET_ORDER.indexOf(activePlanetKey);
+            const nextIndex = (currentIndex + direction + PLANET_ORDER.length) % PLANET_ORDER.length;
+            switchPlanet(PLANET_ORDER[nextIndex]);
+            setGestureMessage(direction < 0 ? `已切到左侧：${PLANETS[activePlanetKey].name}` : `已切到右侧：${PLANETS[activePlanetKey].name}`);
+        }
+
+        function setGestureMode(mode, message) {
+            gestureControl.mode = mode;
+            setGestureMessage(message);
+            document.querySelectorAll(".gesture-token").forEach((token) => {
+                token.classList.toggle("active", token.dataset.gesture === mode);
+            });
+        }
+
+        function setGestureMessage(message) {
+            gestureState.textContent = message;
+        }
+
+        function resizeHandOverlay() {
+            const rect = handOverlay.getBoundingClientRect();
+            const width = Math.max(1, Math.floor(rect.width * window.devicePixelRatio));
+            const height = Math.max(1, Math.floor(rect.height * window.devicePixelRatio));
+            if (handOverlay.width !== width || handOverlay.height !== height) {
+                handOverlay.width = width;
+                handOverlay.height = height;
+            }
+        }
+
+        function drawHandOverlay(handSets) {
+            handOverlayContext.clearRect(0, 0, handOverlay.width, handOverlay.height);
+            if (!handSets.length) return;
+
+            const chains = [
+                [0, 1, 2, 3, 4],
+                [0, 5, 6, 7, 8],
+                [0, 9, 10, 11, 12],
+                [0, 13, 14, 15, 16],
+                [0, 17, 18, 19, 20],
+                [5, 9, 13, 17]
+            ];
+
+            handOverlayContext.save();
+            handOverlayContext.lineWidth = 2;
+            handOverlayContext.strokeStyle = "rgba(240, 191, 98, 0.82)";
+            handOverlayContext.fillStyle = "rgba(134, 214, 255, 0.9)";
+
+            handSets.forEach((landmarks) => {
+                chains.forEach((chain) => {
+                    handOverlayContext.beginPath();
+                    chain.forEach((index, chainIndex) => {
+                        const x = landmarks[index].x * handOverlay.width;
+                        const y = landmarks[index].y * handOverlay.height;
+                        if (chainIndex === 0) handOverlayContext.moveTo(x, y);
+                        else handOverlayContext.lineTo(x, y);
+                    });
+                    handOverlayContext.stroke();
+                });
+
+                landmarks.forEach((landmark, index) => {
+                    handOverlayContext.beginPath();
+                    handOverlayContext.arc(
+                        landmark.x * handOverlay.width,
+                        landmark.y * handOverlay.height,
+                        index === 8 || index === 12 ? 4 : 2.5,
+                        0,
+                        Math.PI * 2
+                    );
+                    handOverlayContext.fill();
+                });
+            });
+
+            handOverlayContext.restore();
+        }
+
+        function getPalmMetrics(landmarks) {
+            const point = (index) => {
+                const landmark = landmarks[index];
+                return { x: 1 - landmark.x, y: landmark.y, z: landmark.z };
+            };
+            const wrist = point(0);
+            const indexMcp = point(5);
+            const middleMcp = point(9);
+            const ringMcp = point(13);
+            const pinkyMcp = point(17);
+            const palmCenter = {
+                x: (wrist.x + indexMcp.x + middleMcp.x + ringMcp.x + pinkyMcp.x) / 5,
+                y: (wrist.y + indexMcp.y + middleMcp.y + ringMcp.y + pinkyMcp.y) / 5
+            };
+            const palmSpan = Math.max(distance2D(indexMcp, pinkyMcp), distance2D(wrist, middleMcp) * 0.74, 0.045);
+            return { palmCenter, palmSpan };
+        }
+
+        function isFingerExtended(tip, pip, mcp, palmCenter, palmSpan) {
+            const length = distance2D(tip, mcp);
+            const tipReach = distance2D(tip, palmCenter);
+            const pipReach = distance2D(pip, palmCenter);
+            return length > palmSpan * 0.62 && tipReach > pipReach * 1.05;
+        }
+
+        function distance2D(a, b) {
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function normalize2D(vector) {
+            const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y) || 1;
+            return { x: vector.x / length, y: vector.y / length };
         }
 
         function switchStage(stage, immediate = false) {
@@ -1290,10 +1845,21 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
+            const delta = Math.min(Math.max(time - lastFrameTime, 0), 0.04);
+            lastFrameTime = time;
             const planet = PLANETS[activePlanetKey];
 
-            moveAttribute(bodyPositions, bodyTargets, 0.045);
-            moveAttribute(ringPositions, ringTargets, 0.052);
+            if (activeStage !== "planet") targetGestureSpread = 0;
+            if (gestureControl.mode === "fist") {
+                targetCameraDistance = THREE.MathUtils.clamp(targetCameraDistance - delta * 8.8, 16, 44);
+            }
+            if (gestureControl.mode === "open") {
+                targetCameraDistance = THREE.MathUtils.clamp(targetCameraDistance + delta * 8.8, 16, 44);
+            }
+
+            gestureSpread = THREE.MathUtils.lerp(gestureSpread, targetGestureSpread, 0.075);
+            moveBodyAttribute(0.045);
+            moveRingAttribute(0.052);
             bodyPoints.geometry.attributes.position.needsUpdate = true;
             ringPoints.geometry.attributes.position.needsUpdate = true;
 
@@ -1302,7 +1868,11 @@
             bodyPoints.material.size = THREE.MathUtils.lerp(bodyPoints.material.size, activeStage === "tree" ? 0.096 : 0.072, 0.08);
             ringPoints.material.size = THREE.MathUtils.lerp(ringPoints.material.size, activeStage === "tree" ? 0.076 : 0.06, 0.08);
             ringPoints.material.opacity = THREE.MathUtils.lerp(ringPoints.material.opacity, targetRingOpacity, 0.06);
-            displayGroup.scale.setScalar(THREE.MathUtils.lerp(displayGroup.scale.x, activeStage === "tree" ? 1.12 : 1, 0.06));
+            displayGroup.scale.setScalar(THREE.MathUtils.lerp(displayGroup.scale.x, activeStage === "tree" ? 1.12 : 1 + gestureSpread * 0.06, 0.06));
+
+            cameraDistance = THREE.MathUtils.lerp(cameraDistance, targetCameraDistance, 0.08);
+            camera.position.z = cameraDistance;
+            cameraDistanceLabel.textContent = `视距 ${cameraDistance.toFixed(1)}`;
 
             manualRotY += activeStage === "planet" ? 0.0016 : 0.0012;
             displayGroup.rotation.y = THREE.MathUtils.lerp(displayGroup.rotation.y, manualRotY, 0.035);
@@ -1332,6 +1902,33 @@
                 pivot.scale.setScalar(scale);
                 pivot.rotation.y += planet.spin * 1.8;
             });
+        }
+
+        function moveBodyAttribute(ease) {
+            for (let i = 0; i < BODY_COUNT; i++) {
+                const seed = bodySeeds[i];
+                const index = i * 3;
+                const spreadX = bodyTargets[index] * (0.5 + seed.shell * 1.35) + Math.cos(seed.orbit) * (1.8 + seed.noise * 3.2);
+                const spreadY = bodyTargets[index + 1] * (0.4 + seed.noise * 1.35) + Math.sin(seed.theta * 2.1) * 2.4;
+                const spreadZ = bodyTargets[index + 2] * (0.5 + seed.shell * 1.35) + Math.sin(seed.orbit) * (1.8 + seed.noise * 3.2);
+                bodyPositions[index] += (bodyTargets[index] + spreadX * gestureSpread - bodyPositions[index]) * ease;
+                bodyPositions[index + 1] += (bodyTargets[index + 1] + spreadY * gestureSpread - bodyPositions[index + 1]) * ease;
+                bodyPositions[index + 2] += (bodyTargets[index + 2] + spreadZ * gestureSpread - bodyPositions[index + 2]) * ease;
+            }
+        }
+
+        function moveRingAttribute(ease) {
+            for (let i = 0; i < RING_COUNT; i++) {
+                const seed = ringSeeds[i];
+                const index = i * 3;
+                const spreadRadius = 2.4 + seed.radius * 8.2;
+                const spreadX = Math.cos(seed.angle) * spreadRadius;
+                const spreadY = seed.height * (3.8 + seed.radius * 4.5) + Math.sin(seed.angle * 2.4) * 0.9;
+                const spreadZ = Math.sin(seed.angle) * spreadRadius;
+                ringPositions[index] += (ringTargets[index] + spreadX * gestureSpread - ringPositions[index]) * ease;
+                ringPositions[index + 1] += (ringTargets[index + 1] + spreadY * gestureSpread - ringPositions[index + 1]) * ease;
+                ringPositions[index + 2] += (ringTargets[index + 2] + spreadZ * gestureSpread - ringPositions[index + 2]) * ease;
+            }
         }
 
         function moveAttribute(current, target, ease) {
