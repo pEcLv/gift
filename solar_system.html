@@ -88,6 +88,10 @@
             box-shadow: 0 18px 70px rgba(0, 0, 0, 0.32);
         }
 
+        body.embedded .mode-switch {
+            display: none;
+        }
+
         .mode-tab {
             min-width: 104px;
             height: 38px;
@@ -521,6 +525,11 @@
         import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
         import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+        const EMBEDDED = new URLSearchParams(window.location.search).has("embed");
+        if (EMBEDDED) {
+            document.body.classList.add("embedded");
+        }
+
         const PLANETS = {
             mercury: {
                 name: "水星",
@@ -916,9 +925,11 @@
                 nav.appendChild(button);
             });
 
-            document.querySelectorAll(".mode-tab").forEach((button) => {
-                button.addEventListener("click", () => switchStage(button.dataset.stage));
-            });
+            if (!EMBEDDED) {
+                document.querySelectorAll(".mode-tab").forEach((button) => {
+                    button.addEventListener("click", () => switchStage(button.dataset.stage));
+                });
+            }
 
             document.getElementById("fullscreen").addEventListener("click", () => {
                 if (!document.fullscreenElement) {
@@ -964,11 +975,11 @@
             });
 
             window.addEventListener("keydown", (event) => {
-                if (event.key.toLowerCase() === "t") {
+                if (!EMBEDDED && event.key.toLowerCase() === "t") {
                     switchStage("tree");
                     return;
                 }
-                if (event.key.toLowerCase() === "p") {
+                if (!EMBEDDED && event.key.toLowerCase() === "p") {
                     switchStage("planet");
                     return;
                 }

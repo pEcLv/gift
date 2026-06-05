@@ -4,12 +4,122 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>粒子礼物</title>
-    <meta http-equiv="refresh" content="0; url=solar_system.html">
-    <script>
-        window.location.replace("solar_system.html");
-    </script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #020309;
+            color: #fff1c4;
+            font-family: "Baskerville", "Songti SC", "STSong", Georgia, serif;
+        }
+
+        .scene-frame {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 380ms ease, visibility 380ms ease;
+            background: #020309;
+        }
+
+        .scene-frame.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .global-switch {
+            position: fixed;
+            top: 132px;
+            left: 34px;
+            z-index: 10;
+            display: flex;
+            gap: 6px;
+            padding: 6px;
+            border: 1px solid rgba(216, 180, 93, 0.28);
+            border-radius: 8px;
+            background: rgba(3, 5, 8, 0.58);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 18px 70px rgba(0, 0, 0, 0.36);
+        }
+
+        .switch-button {
+            width: 112px;
+            height: 38px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: rgba(255, 241, 196, 0.68);
+            font: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 180ms ease, background 180ms ease, border-color 180ms ease, transform 180ms ease;
+        }
+
+        .switch-button:hover {
+            color: #fff1c4;
+            transform: translateY(-1px);
+        }
+
+        .switch-button.active[data-scene="tree"] {
+            color: #fff1c4;
+            border-color: rgba(103, 222, 153, 0.58);
+            background: rgba(47, 179, 111, 0.18);
+            box-shadow: inset 0 0 18px rgba(47, 179, 111, 0.2);
+        }
+
+        .switch-button.active[data-scene="planet"] {
+            color: #fff1c4;
+            border-color: rgba(240, 191, 98, 0.72);
+            background: rgba(240, 191, 98, 0.16);
+            box-shadow: inset 0 0 18px rgba(240, 191, 98, 0.2);
+        }
+
+        @media (max-width: 900px) {
+            .global-switch {
+                top: 78px;
+                left: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <a href="solar_system.html">打开粒子礼物</a>
+    <iframe class="scene-frame" data-scene="tree" src="christmas_tree_scene.html" title="粒子圣诞树"></iframe>
+    <iframe class="scene-frame" data-scene="planet" src="solar_system.html?embed=1" title="粒子太阳系"></iframe>
+
+    <nav class="global-switch" aria-label="主场景切换">
+        <button class="switch-button" type="button" data-scene="tree">圣诞树</button>
+        <button class="switch-button" type="button" data-scene="planet">星球</button>
+    </nav>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const defaultScene = params.get("scene") === "planet" ? "planet" : "tree";
+
+        function switchScene(scene) {
+            document.querySelectorAll(".scene-frame").forEach((frame) => {
+                frame.classList.toggle("active", frame.dataset.scene === scene);
+            });
+            document.querySelectorAll(".switch-button").forEach((button) => {
+                button.classList.toggle("active", button.dataset.scene === scene);
+            });
+            history.replaceState(null, "", `?scene=${scene}`);
+        }
+
+        document.querySelectorAll(".switch-button").forEach((button) => {
+            button.addEventListener("click", () => switchScene(button.dataset.scene));
+        });
+
+        switchScene(defaultScene);
+    </script>
 </body>
 </html>

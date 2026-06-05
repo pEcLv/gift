@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子圣诞树</title>
+    <style>
+        :root {
+            --gold: #d8b45d;
+            --cream: #fff1c4;
+            --green: #2fb36f;
+            --deep: #030503;
+            --red: #d9483f;
+            --line: rgba(216, 180, 93, 0.32);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #020302;
+            color: var(--cream);
+            font-family: "Baskerville", "Songti SC", "STSong", Georgia, serif;
+            user-select: none;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 18% 22%, rgba(180, 42, 38, 0.22), transparent 28%),
+                radial-gradient(circle at 80% 44%, rgba(33, 111, 77, 0.24), transparent 34%),
+                radial-gradient(circle at 50% 110%, rgba(216, 180, 93, 0.18), transparent 38%),
+                linear-gradient(150deg, #090407 0%, #06120b 48%, #020302 100%);
+            pointer-events: none;
+        }
+
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+        }
+
+        .ui {
+            position: fixed;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .ui * {
+            pointer-events: auto;
+        }
+
+        .title {
+            left: 34px;
+            top: 30px;
+            max-width: 520px;
+        }
+
+        .eyebrow {
+            font-size: 12px;
+            letter-spacing: 4px;
+            color: var(--gold);
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 8px 0 0;
+            font-size: 64px;
+            line-height: 0.95;
+            font-weight: 600;
+            letter-spacing: 0;
+            text-shadow: 0 0 28px rgba(216, 180, 93, 0.34);
+        }
+
+        .panel {
+            right: 34px;
+            top: 30px;
+            width: 300px;
+            padding: 16px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(9, 20, 13, 0.82), rgba(4, 6, 4, 0.66));
+            backdrop-filter: blur(18px);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42), inset 0 0 24px rgba(47, 179, 111, 0.07);
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
+            line-height: 1;
+        }
+
+        .swatch {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 36% 32%, #fff8cf, #d8b45d 42%, #2fb36f 76%);
+            box-shadow: 0 0 28px rgba(216, 180, 93, 0.48);
+            flex: 0 0 auto;
+        }
+
+        .panel-subtitle {
+            margin: 4px 0 0 46px;
+            color: rgba(255, 241, 196, 0.64);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .panel-copy {
+            margin: 14px 0 0;
+            color: rgba(255, 241, 196, 0.8);
+            font-size: 14px;
+            line-height: 1.64;
+        }
+
+        .mode-bar {
+            left: 50%;
+            bottom: 28px;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: min(760px, calc(100vw - 36px));
+            padding: 8px;
+            border: 1px solid rgba(216, 180, 93, 0.28);
+            border-radius: 8px;
+            background: rgba(3, 5, 3, 0.62);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 18px 70px rgba(0, 0, 0, 0.44);
+        }
+
+        .mode-button,
+        .upload-button {
+            min-width: 0;
+            height: 48px;
+            border: 1px solid rgba(255, 241, 196, 0.14);
+            border-radius: 6px;
+            background: rgba(255, 241, 196, 0.035);
+            color: rgba(255, 241, 196, 0.72);
+            font: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 180ms ease, color 180ms ease, border-color 180ms ease, background 180ms ease;
+        }
+
+        .mode-button {
+            flex: 1 1 0;
+        }
+
+        .upload-button {
+            flex: 1.15 1 0;
+        }
+
+        .mode-button:hover,
+        .upload-button:hover {
+            transform: translateY(-2px);
+            color: var(--cream);
+            border-color: rgba(255, 241, 196, 0.42);
+            background: rgba(255, 241, 196, 0.07);
+        }
+
+        .mode-button.active {
+            color: var(--cream);
+            border-color: rgba(216, 180, 93, 0.78);
+            background: rgba(216, 180, 93, 0.16);
+            box-shadow: inset 0 0 18px rgba(216, 180, 93, 0.2), 0 0 28px rgba(216, 180, 93, 0.18);
+        }
+
+        .fullscreen {
+            right: 354px;
+            top: 30px;
+            width: 42px;
+            height: 42px;
+            border: 1px solid rgba(216, 180, 93, 0.28);
+            border-radius: 50%;
+            background: rgba(3, 5, 3, 0.58);
+            color: var(--gold);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(14px);
+        }
+
+        .fullscreen svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        #loader {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: grid;
+            place-items: center;
+            background: #020302;
+            transition: opacity 650ms ease;
+        }
+
+        .loader-ring {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: 1px solid rgba(216, 180, 93, 0.22);
+            border-top-color: var(--gold);
+            animation: spin 1100ms linear infinite;
+            box-shadow: 0 0 30px rgba(216, 180, 93, 0.28);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 900px) {
+            .title {
+                left: 20px;
+                top: 18px;
+                max-width: calc(100vw - 40px);
+            }
+
+            h1 {
+                font-size: 40px;
+            }
+
+            .panel {
+                display: none;
+            }
+
+            .fullscreen {
+                right: 18px;
+                top: 18px;
+            }
+
+            .mode-bar {
+                bottom: 14px;
+                flex-wrap: wrap;
+            }
+
+            .mode-button,
+            .upload-button {
+                height: 42px;
+                flex-basis: calc(50% - 4px);
+                font-size: 13px;
+            }
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <header class="ui title">
+        <div class="eyebrow">Holiday Particle Tree</div>
+        <h1>Merry Christmas</h1>
+    </header>
+
+    <aside class="ui panel">
+        <div class="panel-title">
+            <span class="swatch"></span>
+            <span>圣诞树</span>
+        </div>
+        <div class="panel-subtitle">Classic Tree Scene</div>
+        <p class="panel-copy">这套场景保留旧版圣诞树的节日表达：树形粒子、暖金灯带、红金饰球、顶部星光、礼盒与照片卡片都独立运行。</p>
+    </aside>
+
+    <button class="ui fullscreen" id="fullscreen" aria-label="切换全屏">
+        <svg viewBox="0 0 24 24">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        </svg>
+    </button>
+
+    <div class="ui mode-bar">
+        <button class="mode-button active" type="button" data-mode="tree">树形</button>
+        <button class="mode-button" type="button" data-mode="scatter">散开</button>
+        <button class="mode-button" type="button" data-mode="focus">照片</button>
+        <button class="upload-button" type="button" id="upload-trigger">添加照片</button>
+        <input id="image-upload" type="file" accept="image/*" hidden>
+    </div>
+
+    <div id="loader">
+        <div class="loader-ring"></div>
+    </div>
+
+    <script type="module">
+        import * as THREE from "three";
+        import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+        import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+        import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+        const PARTICLE_COUNT = 12500;
+        const SNOW_COUNT = 1400;
+        const clock = new THREE.Clock();
+
+        let scene, camera, renderer, composer;
+        let treeGroup, particlePoints, snowPoints, starMesh, ornamentGroup, giftGroup, photoGroup;
+        let positions, targets, scatterTargets, colors, snowPositions;
+        let activeMode = "tree";
+        let activePhotoIndex = 0;
+        let pointerDown = null;
+        let manualRotX = 0.1;
+        let manualRotY = -0.18;
+        const seeds = [];
+        const ornaments = [];
+        const photos = [];
+        const color = new THREE.Color();
+
+        init();
+
+        function init() {
+            setupThree();
+            setupParticles();
+            setupOrnaments();
+            setupGifts();
+            setupPhotos();
+            setupSnow();
+            setupUI();
+            setMode("tree", true);
+            animate();
+
+            const loader = document.getElementById("loader");
+            requestAnimationFrame(() => {
+                loader.style.opacity = "0";
+                setTimeout(() => { loader.style.display = "none"; }, 700);
+            });
+        }
+
+        function setupThree() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x040704, 0.018);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 900);
+            camera.position.set(0, 1.8, 31);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.24;
+            document.getElementById("canvas-container").appendChild(renderer.domElement);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.88, 0.48, 0.18));
+
+            scene.add(new THREE.AmbientLight(0xf4e3bd, 0.54));
+
+            const warmLight = new THREE.PointLight(0xffc76c, 3.4, 88);
+            warmLight.position.set(-6, 8, 12);
+            scene.add(warmLight);
+
+            const greenLight = new THREE.PointLight(0x53d98f, 1.8, 90);
+            greenLight.position.set(10, 1, -12);
+            scene.add(greenLight);
+
+            treeGroup = new THREE.Group();
+            scene.add(treeGroup);
+
+            ornamentGroup = new THREE.Group();
+            giftGroup = new THREE.Group();
+            photoGroup = new THREE.Group();
+            treeGroup.add(ornamentGroup, giftGroup, photoGroup);
+        }
+
+        function setupParticles() {
+            positions = new Float32Array(PARTICLE_COUNT * 3);
+            targets = new Float32Array(PARTICLE_COUNT * 3);
+            scatterTargets = new Float32Array(PARTICLE_COUNT * 3);
+            colors = new Float32Array(PARTICLE_COUNT * 3);
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const typeRoll = Math.random();
+                const seed = {
+                    theta: Math.random() * Math.PI * 2,
+                    layer: Math.random(),
+                    radial: Math.pow(Math.random(), 0.58),
+                    jitter: Math.random(),
+                    type: typeRoll < 0.72 ? "foliage" : typeRoll < 0.86 ? "garland" : typeRoll < 0.94 ? "ornament" : typeRoll < 0.975 ? "star" : "trunk"
+                };
+                seeds.push(seed);
+
+                const start = randomSphere(25);
+                positions[i * 3] = start.x;
+                positions[i * 3 + 1] = start.y;
+                positions[i * 3 + 2] = start.z;
+
+                const scatter = randomSphere(28);
+                scatterTargets[i * 3] = scatter.x;
+                scatterTargets[i * 3 + 1] = scatter.y;
+                scatterTargets[i * 3 + 2] = scatter.z;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.088,
+                map: createParticleTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.95,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            particlePoints = new THREE.Points(geometry, material);
+            treeGroup.add(particlePoints);
+        }
+
+        function setupOrnaments() {
+            const ornamentMaterials = [
+                new THREE.MeshPhysicalMaterial({ color: 0xd9483f, roughness: 0.22, metalness: 0.25, clearcoat: 1, emissive: 0x2d0503, emissiveIntensity: 0.25 }),
+                new THREE.MeshStandardMaterial({ color: 0xd8b45d, roughness: 0.16, metalness: 0.86, emissive: 0x6f4d16, emissiveIntensity: 0.16 }),
+                new THREE.MeshStandardMaterial({ color: 0xfff1c4, roughness: 0.2, metalness: 0.35, emissive: 0x80683d, emissiveIntensity: 0.18 })
+            ];
+            const ornamentGeometry = new THREE.SphereGeometry(0.16, 18, 14);
+
+            for (let i = 0; i < 92; i++) {
+                const mesh = new THREE.Mesh(ornamentGeometry, ornamentMaterials[i % ornamentMaterials.length]);
+                const t = 0.08 + Math.random() * 0.78;
+                const angle = i * 1.92 + Math.random() * 0.7;
+                const cone = Math.max(0.06, 1 - t);
+                const radius = 5.25 * Math.pow(cone, 0.82) * (0.78 + Math.random() * 0.18);
+                mesh.userData.treeTarget = new THREE.Vector3(
+                    Math.cos(angle) * radius,
+                    -5.75 + t * 11.7,
+                    Math.sin(angle) * radius
+                );
+                mesh.userData.scatterTarget = randomSphere(18);
+                mesh.position.copy(randomSphere(24));
+                ornamentGroup.add(mesh);
+                ornaments.push(mesh);
+            }
+
+            starMesh = new THREE.Mesh(
+                createStarGeometry(1.2, 0.48, 5),
+                new THREE.MeshBasicMaterial({ color: 0xffefad, transparent: true, opacity: 0.96, side: THREE.DoubleSide })
+            );
+            starMesh.position.set(0, 7.65, 0.08);
+            treeGroup.add(starMesh);
+        }
+
+        function setupGifts() {
+            const palettes = [
+                [0xa83232, 0xd8b45d],
+                [0x1f8f5c, 0xfff1c4],
+                [0x2b5c9a, 0xd8b45d],
+                [0x7d355d, 0xffd4e1]
+            ];
+
+            for (let i = 0; i < 12; i++) {
+                const box = new THREE.Group();
+                const [baseColor, ribbonColor] = palettes[i % palettes.length];
+                const sx = 0.9 + Math.random() * 0.55;
+                const sy = 0.58 + Math.random() * 0.42;
+                const sz = 0.72 + Math.random() * 0.46;
+                const boxMat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.42, metalness: 0.08 });
+                const ribbonMat = new THREE.MeshStandardMaterial({ color: ribbonColor, roughness: 0.22, metalness: 0.4, emissive: ribbonColor, emissiveIntensity: 0.04 });
+
+                const base = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), boxMat);
+                const ribbonA = new THREE.Mesh(new THREE.BoxGeometry(sx * 1.03, sy * 1.04, 0.08), ribbonMat);
+                const ribbonB = new THREE.Mesh(new THREE.BoxGeometry(0.08, sy * 1.05, sz * 1.03), ribbonMat);
+                box.add(base, ribbonA, ribbonB);
+
+                const angle = i / 12 * Math.PI * 2 + Math.random() * 0.2;
+                const radius = 3.2 + Math.random() * 3.7;
+                box.position.set(Math.cos(angle) * radius, -7.05 + sy * 0.5, Math.sin(angle) * radius);
+                box.rotation.y = -angle + Math.PI / 2;
+                giftGroup.add(box);
+            }
+        }
+
+        function setupPhotos() {
+            addPhotoCard(createDefaultPhotoTexture());
+        }
+
+        function setupSnow() {
+            snowPositions = new Float32Array(SNOW_COUNT * 3);
+            const snowColors = new Float32Array(SNOW_COUNT * 3);
+            for (let i = 0; i < SNOW_COUNT; i++) {
+                snowPositions[i * 3] = (Math.random() - 0.5) * 54;
+                snowPositions[i * 3 + 1] = -8 + Math.random() * 26;
+                snowPositions[i * 3 + 2] = -18 + Math.random() * 42;
+                snowColors[i * 3] = 0.95;
+                snowColors[i * 3 + 1] = 0.9;
+                snowColors[i * 3 + 2] = 0.74;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
+            geometry.setAttribute("color", new THREE.BufferAttribute(snowColors, 3));
+            snowPoints = new THREE.Points(geometry, new THREE.PointsMaterial({
+                size: 0.07,
+                map: createParticleTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.55,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            scene.add(snowPoints);
+        }
+
+        function setupUI() {
+            document.querySelectorAll(".mode-button").forEach((button) => {
+                button.addEventListener("click", () => setMode(button.dataset.mode));
+            });
+
+            const upload = document.getElementById("image-upload");
+            document.getElementById("upload-trigger").addEventListener("click", () => upload.click());
+            upload.addEventListener("change", (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (loadEvent) => {
+                    new THREE.TextureLoader().load(loadEvent.target.result, (texture) => {
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                        activePhotoIndex = addPhotoCard(texture);
+                        setMode("focus");
+                    });
+                };
+                reader.readAsDataURL(file);
+                upload.value = "";
+            });
+
+            document.getElementById("fullscreen").addEventListener("click", () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+
+            window.addEventListener("resize", () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                composer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            window.addEventListener("pointerdown", (event) => {
+                if (event.target.closest(".ui")) return;
+                pointerDown = { x: event.clientX, y: event.clientY };
+            });
+
+            window.addEventListener("pointermove", (event) => {
+                if (!pointerDown) return;
+                const dx = event.clientX - pointerDown.x;
+                const dy = event.clientY - pointerDown.y;
+                manualRotY += dx * 0.001;
+                manualRotX = THREE.MathUtils.clamp(manualRotX + dy * 0.0007, -0.42, 0.48);
+                pointerDown = { x: event.clientX, y: event.clientY };
+            });
+
+            window.addEventListener("pointerup", () => { pointerDown = null; });
+        }
+
+        function setMode(mode, immediate = false) {
+            activeMode = mode;
+            document.querySelectorAll(".mode-button").forEach((button) => {
+                button.classList.toggle("active", button.dataset.mode === mode);
+            });
+            rebuildTargets();
+
+            if (immediate) {
+                positions.set(targets);
+                particlePoints.geometry.attributes.position.needsUpdate = true;
+            }
+        }
+
+        function rebuildTargets() {
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const seed = seeds[i];
+                let target;
+                let colorValue;
+
+                if (activeMode === "scatter") {
+                    target = {
+                        x: scatterTargets[i * 3],
+                        y: scatterTargets[i * 3 + 1],
+                        z: scatterTargets[i * 3 + 2]
+                    };
+                    colorValue = pickScatterColor(seed);
+                } else if (activeMode === "focus") {
+                    const angle = seed.theta;
+                    const radius = 10 + seed.radial * 15;
+                    target = {
+                        x: Math.cos(angle) * radius,
+                        y: -1 + (seed.layer - 0.5) * 13,
+                        z: Math.sin(angle) * radius - 8
+                    };
+                    colorValue = seed.type === "garland" ? "#d8b45d" : "#17351f";
+                } else {
+                    target = getTreeTarget(seed);
+                    colorValue = pickTreeColor(seed);
+                }
+
+                targets[i * 3] = target.x;
+                targets[i * 3 + 1] = target.y;
+                targets[i * 3 + 2] = target.z;
+
+                color.set(colorValue);
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+            }
+
+            particlePoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function getTreeTarget(seed) {
+            if (seed.type === "trunk") {
+                const r = 0.28 + seed.radial * 0.48;
+                return {
+                    x: Math.cos(seed.theta) * r,
+                    y: -7.25 + seed.layer * 2.25,
+                    z: Math.sin(seed.theta) * r
+                };
+            }
+
+            if (seed.type === "star") {
+                const point = Math.floor(seed.layer * 5);
+                const spoke = point * Math.PI * 0.4 - Math.PI / 2;
+                const r = (0.22 + seed.radial * 1.12) * (seed.jitter > 0.46 ? 1 : 0.46);
+                return {
+                    x: Math.cos(spoke + seed.theta * 0.06) * r,
+                    y: 7.48 + Math.sin(spoke + seed.theta * 0.06) * r * 0.72,
+                    z: (seed.jitter - 0.5) * 0.28
+                };
+            }
+
+            if (seed.type === "garland") {
+                const yNorm = seed.layer;
+                const y = -5.72 + yNorm * 11.65;
+                const cone = Math.max(0.05, 1 - yNorm);
+                const r = 5.88 * Math.pow(cone, 0.82) + 0.12;
+                const angle = yNorm * Math.PI * 14.2 + seed.theta * 0.18;
+                return {
+                    x: Math.cos(angle) * r,
+                    y,
+                    z: Math.sin(angle) * r
+                };
+            }
+
+            if (seed.type === "ornament") {
+                const yNorm = seed.layer;
+                const y = -5.3 + yNorm * 10.9;
+                const cone = Math.max(0.08, 1 - yNorm);
+                const r = 5.15 * Math.pow(cone, 0.8) * (0.78 + seed.radial * 0.2);
+                return {
+                    x: Math.cos(seed.theta + yNorm * Math.PI * 2.5) * r,
+                    y,
+                    z: Math.sin(seed.theta + yNorm * Math.PI * 2.5) * r
+                };
+            }
+
+            const yNorm = seed.layer;
+            const y = -5.95 + yNorm * 12.2;
+            const cone = Math.max(0.04, 1 - yNorm);
+            const branchStep = Math.floor(yNorm * 12);
+            const branchWave = 0.78 + 0.22 * Math.sin(branchStep * 2.15 + seed.theta * 3.4);
+            const r = (0.36 + seed.radial * 0.7) * 5.9 * Math.pow(cone, 0.78) * branchWave;
+            const angle = seed.theta + yNorm * Math.PI * 17.8;
+            return {
+                x: Math.cos(angle) * r,
+                y: y + Math.sin(seed.theta * 4) * 0.16,
+                z: Math.sin(angle) * r
+            };
+        }
+
+        function pickTreeColor(seed) {
+            if (seed.type === "trunk") return seed.jitter > 0.45 ? "#8c5a33" : "#b17638";
+            if (seed.type === "star") return seed.jitter > 0.28 ? "#fff3bd" : "#d8b45d";
+            if (seed.type === "garland") return seed.jitter > 0.78 ? "#fff1c4" : "#d8b45d";
+            if (seed.type === "ornament") {
+                if (seed.jitter < 0.34) return "#d9483f";
+                if (seed.jitter < 0.68) return "#d8b45d";
+                return "#fff1c4";
+            }
+            if (seed.jitter > 0.89) return "#fff1c4";
+            if (seed.jitter > 0.67) return "#54dc91";
+            return seed.jitter > 0.34 ? "#2fb36f" : "#145f3a";
+        }
+
+        function pickScatterColor(seed) {
+            if (seed.type === "star" || seed.type === "garland") return "#d8b45d";
+            if (seed.type === "ornament") return seed.jitter > 0.5 ? "#d9483f" : "#fff1c4";
+            return seed.jitter > 0.55 ? "#2fb36f" : "#184d31";
+        }
+
+        function addPhotoCard(texture) {
+            const card = new THREE.Group();
+            const frame = new THREE.Mesh(
+                new THREE.BoxGeometry(3.35, 4.05, 0.1),
+                new THREE.MeshStandardMaterial({ color: 0xf6e5bc, roughness: 0.32, metalness: 0.18 })
+            );
+            const image = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.85, 2.8),
+                new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+            );
+            image.position.set(0, 0.4, 0.08);
+            card.add(frame, image);
+            card.scale.setScalar(0.62);
+            photoGroup.add(card);
+            photos.push(card);
+            return photos.length - 1;
+        }
+
+        function createDefaultPhotoTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext("2d");
+            const gradient = ctx.createRadialGradient(256, 210, 40, 256, 256, 330);
+            gradient.addColorStop(0, "#fff7d3");
+            gradient.addColorStop(1, "#254c34");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 512, 512);
+            ctx.fillStyle = "#d9483f";
+            ctx.beginPath();
+            ctx.arc(180, 205, 44, 0, Math.PI * 2);
+            ctx.arc(332, 205, 44, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#d8b45d";
+            ctx.font = "bold 46px Georgia, serif";
+            ctx.textAlign = "center";
+            ctx.fillText("MEMORY", 256, 345);
+            ctx.fillStyle = "rgba(255, 241, 196, 0.86)";
+            ctx.font = "24px Georgia, serif";
+            ctx.fillText("Holiday Card", 256, 385);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            return texture;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            for (let i = 0; i < positions.length; i++) {
+                positions[i] += (targets[i] - positions[i]) * 0.052;
+            }
+            particlePoints.geometry.attributes.position.needsUpdate = true;
+
+            updateOrnaments();
+            updatePhotos(time);
+            updateSnow(time);
+
+            const targetRotX = activeMode === "focus" ? 0.04 : manualRotX;
+            manualRotY += activeMode === "tree" ? 0.0014 : 0.0008;
+            treeGroup.rotation.y = THREE.MathUtils.lerp(treeGroup.rotation.y, manualRotY, 0.035);
+            treeGroup.rotation.x = THREE.MathUtils.lerp(treeGroup.rotation.x, targetRotX, 0.035);
+
+            starMesh.rotation.z = Math.sin(time * 1.4) * 0.08;
+            starMesh.scale.setScalar(1 + Math.sin(time * 2.1) * 0.05);
+            ornamentGroup.visible = activeMode !== "focus";
+            giftGroup.visible = activeMode !== "focus";
+
+            composer.passes[1].strength = activeMode === "focus" ? 0.58 : 0.88;
+            composer.render();
+        }
+
+        function updateOrnaments() {
+            ornaments.forEach((mesh) => {
+                const target = activeMode === "scatter" ? mesh.userData.scatterTarget : mesh.userData.treeTarget;
+                const scale = activeMode === "focus" ? 0.08 : 1;
+                mesh.position.lerp(target, 0.06);
+                mesh.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.06);
+                mesh.rotation.y += 0.012;
+            });
+        }
+
+        function updatePhotos(time) {
+            photos.forEach((card, index) => {
+                let target;
+                let scale;
+                if (activeMode === "focus" && index === activePhotoIndex) {
+                    target = new THREE.Vector3(0, 0.6, 8);
+                    scale = 1.55;
+                    card.rotation.set(0, 0, 0);
+                } else {
+                    const angle = time * 0.28 + index * Math.PI * 2 / Math.max(photos.length, 1);
+                    const radius = 8.2 + index * 0.32;
+                    target = new THREE.Vector3(Math.cos(angle) * radius, -1.8 + Math.sin(angle * 1.7) * 1.3, Math.sin(angle) * radius);
+                    scale = activeMode === "focus" ? 0.36 : 0.62;
+                    card.lookAt(camera.position);
+                }
+                card.position.lerp(target, 0.07);
+                card.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.08);
+            });
+        }
+
+        function updateSnow(time) {
+            for (let i = 0; i < SNOW_COUNT; i++) {
+                snowPositions[i * 3] += Math.sin(time * 0.55 + i) * 0.002;
+                snowPositions[i * 3 + 1] -= 0.022 + (i % 7) * 0.001;
+                if (snowPositions[i * 3 + 1] < -10) {
+                    snowPositions[i * 3] = (Math.random() - 0.5) * 54;
+                    snowPositions[i * 3 + 1] = 18;
+                    snowPositions[i * 3 + 2] = -18 + Math.random() * 42;
+                }
+            }
+            snowPoints.geometry.attributes.position.needsUpdate = true;
+        }
+
+        function createParticleTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext("2d");
+            const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, "rgba(255,255,255,1)");
+            gradient.addColorStop(0.34, "rgba(255,255,255,0.8)");
+            gradient.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createStarGeometry(outerRadius, innerRadius, points) {
+            const shape = new THREE.Shape();
+            for (let i = 0; i < points * 2; i++) {
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                const angle = i / (points * 2) * Math.PI * 2 - Math.PI / 2;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                if (i === 0) shape.moveTo(x, y);
+                else shape.lineTo(x, y);
+            }
+            shape.closePath();
+            return new THREE.ShapeGeometry(shape);
+        }
+
+        function randomSphere(radius) {
+            const theta = Math.random() * Math.PI * 2;
+            const z = Math.random() * 2 - 1;
+            const root = Math.sqrt(1 - z * z);
+            const r = radius * Math.pow(Math.random(), 0.38);
+            return new THREE.Vector3(r * root * Math.cos(theta), r * z, r * root * Math.sin(theta));
+        }
+    </script>
+</body>
+</html>
