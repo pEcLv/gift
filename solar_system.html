@@ -828,6 +828,7 @@
                     inner: 5.1,
                     outer: 9.7,
                     tilt: 0.31,
+                    roll: -0.16,
                     thickness: 0.16,
                     palette: ["#ffe3a1", "#d8a557", "#86653a", "#45352a"],
                     opacity: 0.86
@@ -876,9 +877,13 @@
         };
 
         const PLANET_ORDER = ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"];
-        const BODY_COUNT = 11800;
-        const RING_COUNT = 8200;
+        const BODY_COUNT = 65000;
+        const RING_COUNT = 55000;
         const STAR_COUNT = 1900;
+        const MIN_CAMERA_DISTANCE = 0.65;
+        const MAX_CAMERA_DISTANCE = 44;
+        const CAMERA_DEFAULT_Y = 2.1;
+        const CAMERA_CENTERING_DISTANCE = 10;
         const clock = new THREE.Clock();
 
         let scene, camera, renderer, composer;
@@ -902,6 +907,302 @@
         const companionObjects = [];
         const raycaster = new THREE.Raycaster();
         const pointer = new THREE.Vector2();
+
+        const TYPE_MAP = { rock: 0.0, cloud: 1.0, earth: 2.0, banded: 3.0, saturn: 4.0, ice: 5.0 };
+
+        let bodyMaterial, ringMaterial;
+        let atmosphereMesh, atmosphereMaterial;
+        let targetAtmosphereScale = 1.0;
+        const targetAtmosphereColor = new THREE.Color();
+        let planetCoreMesh, planetCoreMaterial, depthMaskMesh;
+        let targetCoreScale = 1.0;
+        let targetCoreOpacity = 0.62;
+
+        let orbitLinesGroup;
+        let nebulaPoints;
+        const targetMouse3D = new THREE.Vector3();
+        const currentMouse3D = new THREE.Vector3();
+        let mouseIntensityTarget = 0.0;
+        let currentMouseIntensity = 0.0;
+        let gridRingMesh, gridRingMesh2;
+
+        const PlanetVertexShader = `
+            uniform float uTime;
+            uniform float uPlanetType;
+            uniform float uSpinSpeed;
+            uniform vec3 uMouse3D;
+            uniform float uMouseIntensity;
+            uniform float uSize;
+            
+            varying vec3 vColor;
+            varying float vOpacity;
+            varying vec3 vLocalPos;
+            
+            float hash(float n) { return fract(sin(n) * 753.5453123); }
+            float noise(vec3 x) {
+                vec3 p = floor(x);
+                vec3 f = fract(x);
+                f = f * f * (3.0 - 2.0 * f);
+                float n = p.x + p.y * 157.0 + 113.0 * p.z;
+                return mix(mix(mix(hash(n+0.0), hash(n+1.0), f.x),
+                               mix(hash(n+157.0), hash(n+158.0), f.x), f.y),
+                           mix(mix(hash(n+113.0), hash(n+114.0), f.x),
+                               mix(hash(n+270.0), hash(n+271.0), f.x), f.y), f.z);
+            }
+            
+            void main() {
+                vLocalPos = position;
+                vec3 pos = position;
+                
+                // 1. Swirling turbulence & smooth orbital wind shear
+                if (uPlanetType > 0.5 && uPlanetType < 1.5) { // Venus swirling clouds
+                    float theta = atan(pos.z, pos.x);
+                    float swirl = sin(pos.y * 1.8 - uTime * 0.4) * 0.25 + cos(theta * 2.0 + uTime * 0.15) * 0.08;
+                    float c = cos(swirl);
+                    float s = sin(swirl);
+                    float nx = pos.x * c - pos.z * s;
+                    pos.z = pos.x * s + pos.z * c;
+                    pos.x = nx;
+                }
+                else if (uPlanetType > 1.5 && uPlanetType < 2.5) { // Earth clouds drift
+                    if (color.r > 0.8 && color.g > 0.8 && color.b > 0.8) {
+                        pos = normalize(pos) * (length(pos) + 0.12);
+                        float driftAngle = uTime * 0.026;
+                        float c = cos(driftAngle);
+                        float s = sin(driftAngle);
+                        float nx = pos.x * c - pos.z * s;
+                        pos.z = pos.x * s + pos.z * c;
+                        pos.x = nx;
+                    }
+                }
+                else if (uPlanetType > 2.5 && uPlanetType < 3.5) { // Jupiter smooth bands & Red Spot
+                    float windSpeed = sin(pos.y * 4.0) * 0.14 * (uSpinSpeed * 50.0 + 0.5);
+                    float shearAngle = windSpeed * uTime * 0.2;
+                    float c = cos(shearAngle);
+                    float s = sin(shearAngle);
+                    float nx = pos.x * c - pos.z * s;
+                    pos.z = pos.x * s + pos.z * c;
+                    pos.x = nx;
+                    
+                    float rotSpot = -uTime * 0.035;
+                    vec3 spotCenter = vec3(2.8 * cos(rotSpot), -0.9, 2.8 * sin(rotSpot));
+                    float dToSpot = distance(pos, spotCenter);
+                    if (dToSpot < 1.5) {
+                        float pull = (1.5 - dToSpot) / 1.5;
+                        vec3 normal = normalize(spotCenter);
+                        vec3 swirlDir = cross(pos - spotCenter, normal);
+                        pos += swirlDir * pull * 0.48;
+                        pos += normal * pull * 0.06;
+                    }
+                }
+                else if (uPlanetType > 3.5 && uPlanetType < 4.5) { // Saturn smooth wind shearing
+                    float windSpeed = sin(pos.y * 3.0) * 0.08 * (uSpinSpeed * 50.0 + 0.5);
+                    float shearAngle = windSpeed * uTime * 0.2;
+                    float c = cos(shearAngle);
+                    float s = sin(shearAngle);
+                    float nx = pos.x * c - pos.z * s;
+                    pos.z = pos.x * s + pos.z * c;
+                    pos.x = nx;
+                }
+                else if (uPlanetType > 4.5 && uPlanetType < 5.5) { // Ice giant waves
+                    float flow = noise(pos * 1.2 + vec3(0.0, uTime * 0.25, uTime * 0.08));
+                    pos += normalize(pos) * flow * 0.05;
+                }
+                
+                // 2. Cursor interactive force field (smooth bulge & swirl)
+                if (uMouseIntensity > 0.01) {
+                    vec3 diff = pos - uMouse3D;
+                    float dist = length(diff);
+                    if (dist < 4.8) {
+                        float force = (1.0 - dist / 4.8) * uMouseIntensity;
+                        vec3 forceDir = normalize(diff + vec3(0.001));
+                        vec3 swirl = cross(forceDir, vec3(0.0, 1.0, 0.0)) * 0.82;
+                        pos += (swirl * 0.8 + forceDir * 0.3) * force;
+                    }
+                }
+                
+                // 3. Shifting color and twinkling
+                vec3 finalCol = color;
+                if (uPlanetType > 2.5 && uPlanetType < 4.5) { // Jupiter, Saturn chemical swirls
+                    finalCol += vec3(sin(pos.y * 6.0 + uTime * 0.25) * 0.06, cos(pos.y * 4.0 - uTime * 0.15) * 0.04, 0.0);
+                } else if (uPlanetType > 4.5 && uPlanetType < 5.5) { // Ice giant neon shift
+                    finalCol += vec3(-0.05, sin(pos.y * 5.0 + uTime * 0.3) * 0.08, cos(pos.y * 3.0 - uTime * 0.2) * 0.08);
+                }
+                vColor = finalCol;
+                
+                float twinkle = sin(uTime * 3.8 + pos.x * 6.5 + pos.y * 8.5) * 0.18 + 0.82;
+                vOpacity = twinkle;
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                gl_PointSize = uSize * (300.0 / -mvPosition.z) * twinkle;
+            }
+        `;
+
+        const PlanetFragmentShader = `
+            uniform float uOpacity;
+            varying vec3 vColor;
+            varying float vOpacity;
+            varying vec3 vLocalPos;
+            
+            void main() {
+                vec2 pc = gl_PointCoord - vec2(0.5);
+                float dist = length(pc);
+                if (dist > 0.5) discard;
+                
+                // Grainy sand texture: sharper falloff, less fuzzy halo
+                float alpha = smoothstep(0.5, 0.15, dist) * 0.85;
+                vec3 finalColor = mix(vColor, vec3(1.0), (1.0 - dist * 2.0) * 0.35);
+                
+                gl_FragColor = vec4(finalColor, alpha * vOpacity * uOpacity);
+            }
+        `;
+
+        const RingVertexShader = `
+            uniform float uTime;
+            uniform float uRingSpeed;
+            uniform float uInnerRadius;
+            uniform float uOuterRadius;
+            uniform float uPlanetType;
+            uniform float uSize;
+            
+            varying vec3 vColor;
+            varying float vOpacity;
+            varying float vDepthShade;
+            
+            void main() {
+                vColor = color;
+                vDepthShade = 0.68;
+                vec3 pos = position;
+                
+                if (uPlanetType > 3.5 && uPlanetType < 5.5) { // Saturn, Uranus Rings
+                    float r = length(pos.xz);
+                    float speed = uRingSpeed / (pow(max(r, 0.1), 1.5));
+                    float angle = uTime * speed;
+                    
+                    float c = cos(angle);
+                    float s = sin(angle);
+                    float nx = pos.x * c - pos.z * s;
+                    pos.z = pos.x * s + pos.z * c;
+                    pos.x = nx;
+                    
+                    float wave = sin(r * 5.2 - uTime * 3.0) * 0.055 * (1.0 - smoothstep(uInnerRadius, uOuterRadius, r) * 0.3);
+                    pos.y += wave;
+                    
+                    float rNorm = (r - uInnerRadius) / (uOuterRadius - uInnerRadius);
+                    // Extremely sharp Cassini Division at 0.46 and Encke Gap at 0.82
+                    float cassiniGap = 1.0 - smoothstep(0.05, 0.0, abs(rNorm - 0.46)) * 1.0;
+                    float enckeGap = 1.0 - smoothstep(0.02, 0.0, abs(rNorm - 0.82)) * 0.92;
+                    
+                    float twinkle = sin(uTime * 5.8 + pos.x * 12.0 + pos.z * 15.0) * 0.28 + 0.72;
+                    float frontArc = smoothstep(-uOuterRadius * 0.52, uOuterRadius * 0.58, pos.z);
+                    vDepthShade = frontArc;
+                    vOpacity = twinkle * cassiniGap * enckeGap * mix(0.34, 1.08, frontArc);
+                } else if (uPlanetType < -0.5) {
+                    vOpacity = 1.0;
+                } else {
+                    float speed = 0.02 * uTime;
+                    float c = cos(speed);
+                    float s = sin(speed);
+                    float nx = pos.x * c - pos.z * s;
+                    pos.z = pos.x * s + pos.z * c;
+                    pos.x = nx;
+                    vOpacity = 0.45;
+                }
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                gl_PointSize = uSize * (300.0 / -mvPosition.z) * vOpacity;
+            }
+        `;
+
+        const RingFragmentShader = `
+            uniform float uOpacity;
+            varying vec3 vColor;
+            varying float vOpacity;
+            varying float vDepthShade;
+            
+            void main() {
+                vec2 pc = gl_PointCoord - vec2(0.5);
+                float dist = length(pc);
+                if (dist > 0.5) discard;
+                
+                // Grainy sand texture: sharper falloff, less fuzzy halo
+                float alpha = smoothstep(0.5, 0.15, dist) * 0.8;
+                vec3 shadedColor = vColor * mix(0.46, 1.16, vDepthShade);
+                vec3 finalColor = mix(shadedColor, vec3(1.0), (1.0 - dist * 2.0) * 0.25);
+                
+                gl_FragColor = vec4(finalColor, alpha * vOpacity * uOpacity);
+            }
+        `;
+
+        const AtmosphereVertexShader = `
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+            
+            void main() {
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                vNormal = normalize(normalMatrix * normal);
+                vViewPosition = -mvPosition.xyz;
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const AtmosphereFragmentShader = `
+            uniform vec3 uColor;
+            uniform float uGlowPower;
+            uniform float uGlowIntensity;
+            
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+            
+            void main() {
+                vec3 normal = normalize(vNormal);
+                vec3 viewDir = normalize(vViewPosition);
+                float dotNL = max(dot(normal, viewDir), 0.0);
+                
+                // Sharp outer neon contour outline + thin inner glow
+                float sharpRim = pow(1.0 - dotNL, 10.0) * 2.0;
+                float softInner = pow(1.0 - dotNL, 3.5) * 0.45;
+                float glow = sharpRim + softInner;
+                
+                // Edge fade to prevent aliasing
+                float edgeFade = smoothstep(0.0, 0.08, dotNL);
+                
+                gl_FragColor = vec4(uColor * 1.3, glow * uGlowIntensity * edgeFade);
+            }
+        `;
+
+        const StarVertexShader = `
+            uniform float uTime;
+            varying vec3 vColor;
+            varying float vTwinkle;
+            
+            void main() {
+                vColor = color;
+                float freq = position.x * 0.04 + position.y * 0.03 + position.z * 0.05;
+                vTwinkle = sin(uTime * 1.6 + freq) * 0.36 + 0.64;
+                
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                gl_PointSize = 1.15 * (300.0 / -mvPosition.z) * vTwinkle;
+            }
+        `;
+
+        const StarFragmentShader = `
+            varying vec3 vColor;
+            varying float vTwinkle;
+            
+            void main() {
+                vec2 pc = gl_PointCoord - vec2(0.5);
+                float dist = length(pc);
+                if (dist > 0.5) discard;
+                
+                float glow = exp(-dist * 6.5);
+                gl_FragColor = vec4(vColor, glow * vTwinkle * 0.88);
+            }
+        `;
+
         const cameraPreview = document.getElementById("camera-preview");
         const handOverlay = document.getElementById("hand-overlay");
         const handOverlayContext = handOverlay.getContext("2d");
@@ -924,6 +1225,9 @@
             setupThree();
             setupStars();
             setupPlanetParticles();
+            setupAtmosphere();
+            setupPlanetShell();
+            setupNebula();
             setupCompanionPlanets();
             setupUI();
             switchStage("planet", true);
@@ -942,7 +1246,8 @@
             scene.fog = new THREE.FogExp2(0x050912, 0.012);
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 900);
-            camera.position.set(0, 2.1, cameraDistance);
+            camera.position.set(0, CAMERA_DEFAULT_Y, cameraDistance);
+            camera.lookAt(0, 0, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -954,7 +1259,7 @@
 
             composer = new EffectComposer(renderer);
             composer.addPass(new RenderPass(scene, camera));
-            composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.52, 0.2));
+            composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.25, 0.85, 0.08));
 
             scene.add(new THREE.AmbientLight(0x8aa4c6, 0.55));
 
@@ -997,13 +1302,16 @@
             geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
             geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
-            const material = new THREE.PointsMaterial({
-                size: 0.12,
-                map: createParticleTexture(),
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0.0 }
+                },
+                vertexShader: StarVertexShader,
+                fragmentShader: StarFragmentShader,
                 vertexColors: true,
                 transparent: true,
-                opacity: 0.72,
                 blending: THREE.AdditiveBlending,
+                depthTest: false,
                 depthWrite: false
             });
 
@@ -1037,17 +1345,27 @@
             bodyGeometry.setAttribute("position", new THREE.BufferAttribute(bodyPositions, 3));
             bodyGeometry.setAttribute("color", new THREE.BufferAttribute(bodyColors, 3));
 
-            const bodyMaterial = new THREE.PointsMaterial({
-                size: 0.072,
-                map: createParticleTexture(),
+            bodyMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0.0 },
+                    uPlanetType: { value: 4.0 },
+                    uSpinSpeed: { value: PLANETS.saturn.spin },
+                    uMouse3D: { value: new THREE.Vector3() },
+                    uMouseIntensity: { value: 0.0 },
+                    uSize: { value: 0.072 },
+                    uOpacity: { value: 0.95 }
+                },
+                vertexShader: PlanetVertexShader,
+                fragmentShader: PlanetFragmentShader,
                 vertexColors: true,
                 transparent: true,
-                opacity: 0.95,
                 blending: THREE.AdditiveBlending,
+                depthTest: false,
                 depthWrite: false
             });
 
             bodyPoints = new THREE.Points(bodyGeometry, bodyMaterial);
+            bodyPoints.renderOrder = 2;
             displayGroup.add(bodyPoints);
 
             ringPositions = new Float32Array(RING_COUNT * 3);
@@ -1074,17 +1392,27 @@
             ringGeometry.setAttribute("position", new THREE.BufferAttribute(ringPositions, 3));
             ringGeometry.setAttribute("color", new THREE.BufferAttribute(ringColors, 3));
 
-            const ringMaterial = new THREE.PointsMaterial({
-                size: 0.06,
-                map: createParticleTexture(),
+            ringMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0.0 },
+                    uRingSpeed: { value: 0.04 },
+                    uInnerRadius: { value: PLANETS.saturn.ring.inner },
+                    uOuterRadius: { value: PLANETS.saturn.ring.outer },
+                    uPlanetType: { value: 4.0 },
+                    uSize: { value: 0.06 },
+                    uOpacity: { value: targetRingOpacity }
+                },
+                vertexShader: RingVertexShader,
+                fragmentShader: RingFragmentShader,
                 vertexColors: true,
                 transparent: true,
-                opacity: targetRingOpacity,
                 blending: THREE.AdditiveBlending,
+                depthTest: true,
                 depthWrite: false
             });
 
             ringPoints = new THREE.Points(ringGeometry, ringMaterial);
+            ringPoints.renderOrder = 3;
             displayGroup.add(ringPoints);
         }
 
@@ -1097,15 +1425,39 @@
                 pivot.userData.speed = 0.055 + index * 0.008;
                 pivot.userData.orbitRadius = 14.5 + index * 1.15;
 
+                const compMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        uColor: { value: new THREE.Color(planet.color) },
+                        uGlowIntensity: { value: 0.65 }
+                    },
+                    vertexShader: `
+                        varying vec3 vNormal;
+                        varying vec3 vViewPosition;
+                        void main() {
+                            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                            vNormal = normalize(normalMatrix * normal);
+                            vViewPosition = -mvPosition.xyz;
+                            gl_Position = projectionMatrix * mvPosition;
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform vec3 uColor;
+                        uniform float uGlowIntensity;
+                        varying vec3 vNormal;
+                        varying vec3 vViewPosition;
+                        void main() {
+                            vec3 normal = normalize(vNormal);
+                            vec3 viewDir = normalize(vViewPosition);
+                            float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+                            vec3 finalColor = mix(uColor * 0.7, vec3(1.0), fresnel * uGlowIntensity * 0.6);
+                            gl_FragColor = vec4(finalColor, 1.0);
+                        }
+                    `
+                });
+
                 const body = new THREE.Mesh(
                     new THREE.SphereGeometry(0.28 + planet.radius * 0.055, 24, 16),
-                    new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(planet.color),
-                        roughness: 0.72,
-                        metalness: 0.05,
-                        emissive: new THREE.Color(planet.color),
-                        emissiveIntensity: 0.12
-                    })
+                    compMaterial
                 );
                 body.userData.key = key;
                 pivot.add(body);
@@ -1128,6 +1480,128 @@
             });
         }
 
+        function setupAtmosphere() {
+            const atmosphereGeom = new THREE.SphereGeometry(1.0, 32, 32);
+            atmosphereMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uColor: { value: new THREE.Color(PLANETS.saturn.color) },
+                    uGlowPower: { value: 4.2 },
+                    uGlowIntensity: { value: 0.62 }
+                },
+                vertexShader: AtmosphereVertexShader,
+                fragmentShader: AtmosphereFragmentShader,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                side: THREE.FrontSide,
+                depthTest: false,
+                depthWrite: false
+            });
+            
+            atmosphereMesh = new THREE.Mesh(atmosphereGeom, atmosphereMaterial);
+            const planet = PLANETS.saturn;
+            targetAtmosphereScale = planet.radius * planet.displayScale * 1.015;
+            atmosphereMesh.scale.setScalar(targetAtmosphereScale);
+            displayGroup.add(atmosphereMesh);
+        }
+
+        function setupPlanetShell() {
+            const sphereGeom = new THREE.SphereGeometry(1.0, 64, 48);
+
+            const depthMaskMaterial = new THREE.MeshBasicMaterial({
+                color: 0x000000,
+                colorWrite: false,
+                depthWrite: true,
+                depthTest: true
+            });
+
+            depthMaskMesh = new THREE.Mesh(sphereGeom, depthMaskMaterial);
+            depthMaskMesh.renderOrder = 0;
+            displayGroup.add(depthMaskMesh);
+
+            planetCoreMaterial = new THREE.MeshBasicMaterial({
+                color: 0x05030a,
+                transparent: true,
+                opacity: targetCoreOpacity,
+                depthTest: false,
+                depthWrite: false
+            });
+
+            planetCoreMesh = new THREE.Mesh(sphereGeom, planetCoreMaterial);
+            planetCoreMesh.renderOrder = 1;
+            displayGroup.add(planetCoreMesh);
+        }
+
+        function setupOrbitLines() {
+            orbitLinesGroup = new THREE.Group();
+            scene.add(orbitLinesGroup);
+            
+            PLANET_ORDER.forEach((key, index) => {
+                const planet = PLANETS[key];
+                const orbitRadius = 14.5 + index * 1.15;
+                
+                const points = [];
+                const segments = 128;
+                for (let i = 0; i <= segments; i++) {
+                    const theta = (i / segments) * Math.PI * 2;
+                    const x = orbitRadius * Math.cos(theta);
+                    const y = -3.8 + Math.sin(theta * 1.7 + index) * 2.3;
+                    const z = orbitRadius * Math.sin(theta) - 5;
+                    points.push(new THREE.Vector3(x, y, z));
+                }
+                
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({
+                    color: new THREE.Color(planet.color),
+                    transparent: true,
+                    opacity: 0.15,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const line = new THREE.Line(geometry, material);
+                orbitLinesGroup.add(line);
+            });
+        }
+
+        function setupNebula() {
+            const count = 12;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            
+            const nebulaPalette = [
+                "#2c56db", "#8c2cdb", "#db2c7a", "#2cdba8"
+            ];
+            
+            for (let i = 0; i < count; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const r = 90 + Math.random() * 50;
+                positions[i * 3] = r * Math.cos(theta);
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 60;
+                positions[i * 3 + 2] = -60 - Math.random() * 60;
+                
+                const color = new THREE.Color(nebulaPalette[i % nebulaPalette.length]);
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+            }
+            
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+            
+            const material = new THREE.PointsMaterial({
+                size: 68.0,
+                map: createNebulaTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.14,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            
+            nebulaPoints = new THREE.Points(geometry, material);
+            scene.add(nebulaPoints);
+        }
+
         function setupUI() {
             const nav = document.getElementById("planet-nav");
 
@@ -1141,20 +1615,6 @@
                 button.innerHTML = `<span class="nav-orb"></span><span class="nav-label">${planet.name}</span>`;
                 button.addEventListener("click", () => switchPlanet(key));
                 nav.appendChild(button);
-            });
-
-            if (!EMBEDDED) {
-                document.querySelectorAll(".mode-tab").forEach((button) => {
-                    button.addEventListener("click", () => switchStage(button.dataset.stage));
-                });
-            }
-
-            document.getElementById("fullscreen").addEventListener("click", () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch(() => {});
-                } else {
-                    document.exitFullscreen();
-                }
             });
 
             gestureButton.addEventListener("click", startGestureControl);
@@ -1186,6 +1646,27 @@
                 pointerDown = { x: event.clientX, y: event.clientY };
             });
 
+            window.addEventListener("pointermove", (event) => {
+                pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+                pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                if (activeStage === "planet") {
+                    const planet = PLANETS[activePlanetKey];
+                    raycaster.setFromCamera(pointer, camera);
+                    const sphereRadius = planet.radius * planet.displayScale;
+                    const planetSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), sphereRadius);
+                    const intersectPoint = new THREE.Vector3();
+                    if (raycaster.ray.intersectSphere(planetSphere, intersectPoint)) {
+                        targetMouse3D.copy(intersectPoint);
+                        mouseIntensityTarget = 1.0;
+                    } else {
+                        mouseIntensityTarget = 0.0;
+                    }
+                } else {
+                    mouseIntensityTarget = 0.0;
+                }
+            });
+
             window.addEventListener("pointerup", (event) => {
                 if (!isDragging) {
                     const key = pickCompanion(event);
@@ -1195,25 +1676,9 @@
                 isDragging = false;
             });
 
-            window.addEventListener("keydown", (event) => {
-                if (!EMBEDDED && event.key.toLowerCase() === "t") {
-                    switchStage("tree");
-                    return;
-                }
-                if (!EMBEDDED && event.key.toLowerCase() === "p") {
-                    switchStage("planet");
-                    return;
-                }
-
-                const index = Number(event.key) - 1;
-                if (index >= 0 && index < PLANET_ORDER.length) {
-                    switchPlanet(PLANET_ORDER[index]);
-                }
-            });
-
             window.addEventListener("wheel", (event) => {
                 if (event.target.closest(".chrome")) return;
-                targetCameraDistance = THREE.MathUtils.clamp(targetCameraDistance + event.deltaY * 0.012, 16, 44);
+                targetCameraDistance = clampCameraDistance(targetCameraDistance + event.deltaY * 0.012);
             }, { passive: true });
         }
 
@@ -1294,6 +1759,7 @@
                 if (performance.now() - gestureControl.lastSeen > 350) {
                     setGestureMode("idle", "未检测到手");
                     gestureControl.previousPinchCenter = null;
+                    gestureControl.pinchLocked = false;
                     gestureControl.pendingDirection = null;
                 }
                 return;
@@ -1302,6 +1768,7 @@
             gestureControl.lastSeen = performance.now();
 
             if (hands.length >= 2) {
+                gestureControl.pinchLocked = false;
                 applyTwoHandGesture(analyzeTwoHands(hands[0], hands[1]));
                 return;
             }
@@ -1324,31 +1791,54 @@
                 y: (wrist.y + indexMcp.y + middleMcp.y + ringMcp.y + pinkyMcp.y) / 5
             };
             const palmSpan = Math.max(distance2D(indexMcp, pinkyMcp), distance2D(wrist, middleMcp) * 0.74, 0.045);
+            const thumbTip = point(4);
+            const indexTip = point(8);
+            const indexPip = point(6);
+            const middleTip = point(12);
+            const middleMcpPoint = point(9);
 
             const extended = {
-                index: isFingerExtended(point(8), point(6), point(5), palmCenter, palmSpan),
-                middle: isFingerExtended(point(12), point(10), point(9), palmCenter, palmSpan),
+                index: isFingerExtended(indexTip, indexPip, point(5), palmCenter, palmSpan),
+                middle: isFingerExtended(middleTip, point(10), middleMcpPoint, palmCenter, palmSpan),
                 ring: isFingerExtended(point(16), point(14), point(13), palmCenter, palmSpan),
                 pinky: isFingerExtended(point(20), point(18), point(17), palmCenter, palmSpan)
             };
-            const thumbReach = distance2D(point(4), palmCenter) / palmSpan;
-            const pinchDistance = distance2D(point(4), point(8)) / palmSpan;
-            const pinchThreshold = gestureControl.pinchLocked ? 0.64 : 0.48;
-            const pinch = pinchDistance < pinchThreshold;
+            const openFingerCount = ["index", "middle", "ring", "pinky"].filter((key) => extended[key]).length;
+            const thumbReach = distance2D(thumbTip, palmCenter) / palmSpan;
+            const indexReach = distance2D(indexTip, palmCenter) / palmSpan;
+            const indexPipReach = distance2D(indexPip, palmCenter) / palmSpan;
+            const pinchDistance = distance2D(thumbTip, indexTip) / palmSpan;
+            const pinchCenter = midpoint2D(thumbTip, indexTip);
+            const pinchCenterReach = distance2D(pinchCenter, palmCenter) / palmSpan;
+            const fist = openFingerCount === 0 && thumbReach < 1.12 && indexReach < 1.08;
+            const pinchThreshold = gestureControl.pinchLocked ? 0.52 : 0.38;
+            const pinchShape = extended.index || openFingerCount > 0 || indexReach > indexPipReach * 0.98;
+            const pinch = !fist && pinchShape && pinchCenterReach > 0.58 && pinchDistance < pinchThreshold;
             gestureControl.pinchLocked = pinch;
 
-            const openFingerCount = ["index", "middle", "ring", "pinky"].filter((key) => extended[key]).length;
             const indexVector = normalize2D({
-                x: point(8).x - point(5).x,
-                y: point(8).y - point(5).y
+                x: indexTip.x - indexMcp.x,
+                y: indexTip.y - indexMcp.y
             });
+            const middleVector = normalize2D({
+                x: middleTip.x - middleMcpPoint.x,
+                y: middleTip.y - middleMcpPoint.y
+            });
+            const twoFingerPoint = extended.index && extended.middle && !extended.ring && !extended.pinky;
+            const pointingVector = twoFingerPoint
+                ? normalize2D({
+                    x: indexVector.x + middleVector.x,
+                    y: indexVector.y + middleVector.y
+                })
+                : indexVector;
 
             return {
                 pinch,
                 palmCenter,
-                indexVector,
+                pointingVector,
                 isSingleIndex: extended.index && !extended.middle && !extended.ring && !extended.pinky,
-                isFist: openFingerCount === 0 && thumbReach < 1.05 && !pinch,
+                isTwoFingerPoint: twoFingerPoint,
+                isFist: fist,
                 isOpen: openFingerCount >= 4 && !pinch
             };
         }
@@ -1388,10 +1878,10 @@
 
             gestureControl.previousPinchCenter = null;
 
-            if (analysis.isSingleIndex) {
-                const horizontal = Math.abs(analysis.indexVector.x);
-                const direction = horizontal > 0.54 && horizontal > Math.abs(analysis.indexVector.y) * 1.08
-                    ? Math.sign(analysis.indexVector.x)
+            if (analysis.isSingleIndex || analysis.isTwoFingerPoint) {
+                const horizontal = Math.abs(analysis.pointingVector.x);
+                const direction = horizontal > 0.54 && horizontal > Math.abs(analysis.pointingVector.y) * 1.08
+                    ? Math.sign(analysis.pointingVector.x)
                     : 0;
 
                 if (direction !== 0) {
@@ -1452,6 +1942,10 @@
 
         function setGestureMessage(message) {
             gestureState.textContent = message;
+        }
+
+        function clampCameraDistance(distance) {
+            return THREE.MathUtils.clamp(distance, MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
         }
 
         function resizeHandOverlay() {
@@ -1541,6 +2035,13 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
+        function midpoint2D(a, b) {
+            return {
+                x: (a.x + b.x) * 0.5,
+                y: (a.y + b.y) * 0.5
+            };
+        }
+
         function normalize2D(vector) {
             const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y) || 1;
             return { x: vector.x / length, y: vector.y / length };
@@ -1551,18 +2052,54 @@
             activeStage = stage;
             updateStageUI();
 
+            const planet = PLANETS[activePlanetKey];
+
             if (stage === "tree") {
                 targetTilt = -0.08;
                 targetRingOpacity = 0.94;
                 document.documentElement.style.setProperty("--active-planet", "#67de99");
                 document.documentElement.style.setProperty("--active-glow", "rgba(103,222,153,0.42)");
+                
+                targetAtmosphereScale = 0.01;
+                targetAtmosphereColor.set("#67de99");
+
+                targetCoreScale = 0.01;
+                targetCoreOpacity = 0.0;
+                
+                if (bodyMaterial) {
+                    bodyMaterial.uniforms.uPlanetType.value = -1.0;
+                    bodyMaterial.uniforms.uSpinSpeed.value = 0.0011;
+                }
+                if (ringMaterial) {
+                    ringMaterial.uniforms.uPlanetType.value = -1.0;
+                }
+                
                 setTreeTargets();
             } else {
-                const planet = PLANETS[activePlanetKey];
                 targetTilt = planet.tilt;
-                targetRingOpacity = planet.ring ? planet.ring.opacity : 0;
+                targetRingOpacity = planet.ring ? planet.ring.opacity : 0.0;
                 document.documentElement.style.setProperty("--active-planet", planet.color);
                 document.documentElement.style.setProperty("--active-glow", planet.glow);
+                
+                targetAtmosphereScale = planet.radius * planet.displayScale * 1.015;
+                targetAtmosphereColor.set(planet.color);
+
+                targetCoreScale = planet.radius * planet.displayScale;
+                targetCoreOpacity = coreOpacityFor(planet);
+                
+                if (bodyMaterial) {
+                    bodyMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
+                    bodyMaterial.uniforms.uSpinSpeed.value = planet.spin;
+                }
+                if (ringMaterial) {
+                    ringMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
+                    if (planet.ring) {
+                        ringMaterial.uniforms.uRingSpeed.value = 0.04;
+                        ringMaterial.uniforms.uInnerRadius.value = planet.ring.inner;
+                        ringMaterial.uniforms.uOuterRadius.value = planet.ring.outer;
+                    }
+                }
+                
                 setBodyTargets(planet);
                 setRingTargets(planet);
                 updateReadout(planet, activePlanetKey);
@@ -1573,15 +2110,22 @@
                 ringPositions.set(ringTargets);
                 bodyPoints.geometry.attributes.position.needsUpdate = true;
                 ringPoints.geometry.attributes.position.needsUpdate = true;
-                ringPoints.material.opacity = targetRingOpacity;
+                
+                if (ringMaterial) {
+                    ringMaterial.uniforms.uOpacity.value = targetRingOpacity;
+                }
                 displayGroup.rotation.x = manualRotX + targetTilt;
+                
+                if (atmosphereMesh) {
+                    atmosphereMesh.scale.setScalar(targetAtmosphereScale);
+                    atmosphereMaterial.uniforms.uColor.value.copy(targetAtmosphereColor);
+                }
+                applyPlanetShellImmediate();
             }
         }
 
         function updateStageUI() {
             document.body.dataset.stage = activeStage;
-            document.getElementById("stage-eyebrow").textContent = activeStage === "tree" ? "Holiday Particle Tree" : "Particle Solar System";
-            document.getElementById("stage-title").textContent = activeStage === "tree" ? "粒子圣诞树" : "粒子太阳系";
             document.querySelectorAll(".mode-tab").forEach((button) => {
                 button.classList.toggle("active", button.dataset.stage === activeStage);
             });
@@ -1595,9 +2139,28 @@
             activeStage = "planet";
             updateStageUI();
             targetTilt = planet.tilt;
-            targetRingOpacity = planet.ring ? planet.ring.opacity : 0;
+            targetRingOpacity = planet.ring ? planet.ring.opacity : 0.0;
             document.documentElement.style.setProperty("--active-planet", planet.color);
             document.documentElement.style.setProperty("--active-glow", planet.glow);
+
+            targetAtmosphereScale = planet.radius * planet.displayScale * 1.015;
+            targetAtmosphereColor.set(planet.color);
+
+            targetCoreScale = planet.radius * planet.displayScale;
+            targetCoreOpacity = coreOpacityFor(planet);
+            
+            if (bodyMaterial) {
+                bodyMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
+                bodyMaterial.uniforms.uSpinSpeed.value = planet.spin;
+            }
+            if (ringMaterial) {
+                ringMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
+                if (planet.ring) {
+                    ringMaterial.uniforms.uRingSpeed.value = 0.04;
+                    ringMaterial.uniforms.uInnerRadius.value = planet.ring.inner;
+                    ringMaterial.uniforms.uOuterRadius.value = planet.ring.outer;
+                }
+            }
 
             setBodyTargets(planet);
             setRingTargets(planet);
@@ -1608,8 +2171,38 @@
                 ringPositions.set(ringTargets);
                 bodyPoints.geometry.attributes.position.needsUpdate = true;
                 ringPoints.geometry.attributes.position.needsUpdate = true;
-                ringPoints.material.opacity = targetRingOpacity;
+                
+                if (ringMaterial) {
+                    ringMaterial.uniforms.uOpacity.value = targetRingOpacity;
+                }
                 displayGroup.rotation.x = manualRotX + targetTilt;
+                
+                if (atmosphereMesh) {
+                    atmosphereMesh.scale.setScalar(targetAtmosphereScale);
+                    atmosphereMaterial.uniforms.uColor.value.copy(targetAtmosphereColor);
+                }
+                applyPlanetShellImmediate();
+            }
+        }
+
+        function coreOpacityFor(planet) {
+            if (planet.type === "saturn") return 0.72;
+            if (planet.type === "banded") return 0.66;
+            if (planet.type === "earth") return 0.48;
+            if (planet.type === "cloud") return 0.44;
+            if (planet.type === "ice") return 0.42;
+            return 0.54;
+        }
+
+        function applyPlanetShellImmediate() {
+            if (planetCoreMesh && planetCoreMaterial) {
+                planetCoreMesh.visible = targetCoreOpacity > 0.01;
+                planetCoreMesh.scale.setScalar(targetCoreScale * 0.994);
+                planetCoreMaterial.opacity = targetCoreOpacity;
+            }
+            if (depthMaskMesh) {
+                depthMaskMesh.visible = activeStage === "planet" && targetRingOpacity > 0.01;
+                depthMaskMesh.scale.setScalar(targetCoreScale * 1.006);
             }
         }
 
@@ -1620,7 +2213,6 @@
             document.getElementById("metric-orbit").textContent = planet.orbit;
             document.getElementById("metric-radius").textContent = planet.radiusLabel;
             document.getElementById("metric-day").textContent = planet.day;
-            document.getElementById("planet-swatch").style.background = planet.color;
 
             document.querySelectorAll(".planet-button").forEach((button) => {
                 button.classList.toggle("active", button.dataset.planet === key);
@@ -1718,12 +2310,7 @@
                 let alphaGap = 1;
 
                 if (hasRing && planet.en === "Saturn") {
-                    const normalized = (radius - ring.inner) / (ring.outer - ring.inner);
-                    if (normalized > 0.45 && normalized < 0.55 && seed.gap < 0.72) {
-                        radius += 0.55;
-                        alphaGap = 0.36;
-                    }
-                    if (normalized > 0.78 && seed.gap < 0.5) alphaGap = 0.55;
+                    // Let the GPU shader handle the physical gap perfectly.
                 }
 
                 if (!hasRing) {
@@ -1735,7 +2322,19 @@
                 ringTargets[i * 3 + 2] = radius * Math.sin(angle);
 
                 const palette = ring.palette;
-                const c = palette[Math.floor(seed.band * palette.length) % palette.length];
+                let c;
+                if (hasRing && planet.en === "Saturn") {
+                    const normalized = (radius - ring.inner) / (ring.outer - ring.inner);
+                    if (normalized < 0.46) {
+                        // Inner ring: bright gold/cream
+                        c = palette[Math.floor(seed.band * 2) % 2];
+                    } else {
+                        // Outer ring: dark brown/grey
+                        c = palette[2 + (Math.floor(seed.band * 2) % 2)];
+                    }
+                } else {
+                    c = palette[Math.floor(seed.band * palette.length) % palette.length];
+                }
                 color.set(c);
                 color.multiplyScalar(hasRing ? alphaGap : 0.25);
                 ringColors[i * 3] = color.r;
@@ -1744,6 +2343,7 @@
             }
 
             ringPoints.rotation.x = ring.tilt;
+            ringPoints.rotation.z = ring.roll || 0;
             ringPoints.geometry.attributes.color.needsUpdate = true;
         }
 
@@ -1838,6 +2438,7 @@
             }
 
             ringPoints.rotation.x = 0;
+            ringPoints.rotation.z = 0;
             bodyPoints.geometry.attributes.color.needsUpdate = true;
             ringPoints.geometry.attributes.color.needsUpdate = true;
         }
@@ -1851,10 +2452,10 @@
 
             if (activeStage !== "planet") targetGestureSpread = 0;
             if (gestureControl.mode === "fist") {
-                targetCameraDistance = THREE.MathUtils.clamp(targetCameraDistance - delta * 8.8, 16, 44);
+                targetCameraDistance = clampCameraDistance(targetCameraDistance - delta * 8.8);
             }
             if (gestureControl.mode === "open") {
-                targetCameraDistance = THREE.MathUtils.clamp(targetCameraDistance + delta * 8.8, 16, 44);
+                targetCameraDistance = clampCameraDistance(targetCameraDistance + delta * 8.8);
             }
 
             gestureSpread = THREE.MathUtils.lerp(gestureSpread, targetGestureSpread, 0.075);
@@ -1863,25 +2464,76 @@
             bodyPoints.geometry.attributes.position.needsUpdate = true;
             ringPoints.geometry.attributes.position.needsUpdate = true;
 
-            bodyPoints.rotation.y += activeStage === "planet" ? planet.spin : 0.0011;
-            ringPoints.rotation.z += activeStage === "planet" ? (planet.ring ? 0.0009 : 0.0002) : 0.0017;
-            bodyPoints.material.size = THREE.MathUtils.lerp(bodyPoints.material.size, activeStage === "tree" ? 0.096 : 0.072, 0.08);
-            ringPoints.material.size = THREE.MathUtils.lerp(ringPoints.material.size, activeStage === "tree" ? 0.076 : 0.06, 0.08);
-            ringPoints.material.opacity = THREE.MathUtils.lerp(ringPoints.material.opacity, targetRingOpacity, 0.06);
-            displayGroup.scale.setScalar(THREE.MathUtils.lerp(displayGroup.scale.x, activeStage === "tree" ? 1.12 : 1 + gestureSpread * 0.06, 0.06));
+            // GPU uniform updates
+            if (bodyMaterial) {
+                bodyMaterial.uniforms.uTime.value = time;
+                const bodySizeTarget = activeStage === "tree" ? 0.096 : 0.068;
+                bodyMaterial.uniforms.uSize.value = THREE.MathUtils.lerp(bodyMaterial.uniforms.uSize.value, bodySizeTarget, 0.08);
+                bodyPoints.rotation.y += activeStage === "planet" ? planet.spin * 0.3 : 0.0011;
+            }
+            
+            if (ringMaterial) {
+                ringMaterial.uniforms.uTime.value = time;
+                const ringSizeTarget = activeStage === "tree" ? 0.076 : 0.055;
+                ringMaterial.uniforms.uSize.value = THREE.MathUtils.lerp(ringMaterial.uniforms.uSize.value, ringSizeTarget, 0.08);
+                const nextOpacity = THREE.MathUtils.lerp(ringMaterial.uniforms.uOpacity.value, targetRingOpacity, 0.06);
+                ringMaterial.uniforms.uOpacity.value = nextOpacity;
+                ringPoints.rotation.z += activeStage === "planet" ? (planet.ring ? 0.0002 : 0.0001) : 0.0017;
+            }
 
-            cameraDistance = THREE.MathUtils.lerp(cameraDistance, targetCameraDistance, 0.08);
-            camera.position.z = cameraDistance;
-            cameraDistanceLabel.textContent = `视距 ${cameraDistance.toFixed(1)}`;
+            if (starPoints && starPoints.material.uniforms) {
+                starPoints.material.uniforms.uTime.value = time;
+                starPoints.rotation.y += 0.00008;
+            }
+
+            // Atmosphere interpolation
+            if (atmosphereMesh && atmosphereMaterial) {
+                atmosphereMesh.visible = (activeStage === "planet");
+                atmosphereMesh.scale.setScalar(THREE.MathUtils.lerp(atmosphereMesh.scale.x, targetAtmosphereScale, 0.05));
+                atmosphereMaterial.uniforms.uColor.value.lerp(targetAtmosphereColor, 0.05);
+            }
+
+            if (planetCoreMesh && planetCoreMaterial) {
+                planetCoreMesh.visible = activeStage === "planet" && targetCoreOpacity > 0.01;
+                planetCoreMesh.scale.setScalar(THREE.MathUtils.lerp(planetCoreMesh.scale.x, targetCoreScale * 0.994, 0.06));
+                planetCoreMaterial.opacity = THREE.MathUtils.lerp(planetCoreMaterial.opacity, targetCoreOpacity, 0.06);
+            }
+
+            if (depthMaskMesh) {
+                depthMaskMesh.visible = activeStage === "planet" && targetRingOpacity > 0.01;
+                depthMaskMesh.scale.setScalar(THREE.MathUtils.lerp(depthMaskMesh.scale.x, targetCoreScale * 1.006, 0.06));
+            }
+
+            // Nebula rotation
+            if (nebulaPoints) {
+                nebulaPoints.rotation.y += 0.00004;
+            }
+
+            // Mouse interaction interpolation
+            currentMouse3D.lerp(targetMouse3D, 0.1);
+            currentMouseIntensity += (mouseIntensityTarget - currentMouseIntensity) * 0.08;
+            if (bodyMaterial) {
+                bodyMaterial.uniforms.uMouse3D.value.copy(currentMouse3D);
+                bodyMaterial.uniforms.uMouseIntensity.value = currentMouseIntensity;
+            }
+
+            displayGroup.scale.setScalar(THREE.MathUtils.lerp(displayGroup.scale.x, activeStage === "tree" ? 1.12 : 1 + gestureSpread * 0.06, 0.06));
 
             manualRotY += activeStage === "planet" ? 0.0016 : 0.0012;
             displayGroup.rotation.y = THREE.MathUtils.lerp(displayGroup.rotation.y, manualRotY, 0.035);
             displayGroup.rotation.x = THREE.MathUtils.lerp(displayGroup.rotation.x, manualRotX + targetTilt, 0.035);
 
+            cameraDistance = THREE.MathUtils.lerp(cameraDistance, targetCameraDistance, 0.08);
+            const centerProgress = 1 - THREE.MathUtils.smoothstep(cameraDistance, MIN_CAMERA_DISTANCE, CAMERA_CENTERING_DISTANCE);
+            camera.position.y = THREE.MathUtils.lerp(CAMERA_DEFAULT_Y, 0, centerProgress);
+            camera.position.z = cameraDistance;
+            camera.lookAt(0, 0, 0);
+            cameraDistanceLabel.textContent = `视距 ${cameraDistance.toFixed(1)}`;
+
             updateCompanions(time);
             starPoints.rotation.y += 0.00008;
 
-            composer.passes[1].strength = activeStage === "tree" ? 0.78 : (planet.ring ? 0.72 : 0.48);
+            composer.passes[1].strength = activeStage === "tree" ? 0.88 : (planet.ring ? 1.35 : 1.10);
             composer.render();
         }
 
@@ -1958,6 +2610,21 @@
             gradient.addColorStop(1, "rgba(255,255,255,0)");
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createNebulaTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext("2d");
+            const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+            gradient.addColorStop(0.25, "rgba(255, 255, 255, 0.45)");
+            gradient.addColorStop(0.55, "rgba(255, 255, 255, 0.12)");
+            gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 128, 128);
             return new THREE.CanvasTexture(canvas);
         }
 
