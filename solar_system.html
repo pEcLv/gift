@@ -2542,7 +2542,13 @@
             setRingTargets(planet);
             updateReadout(planet, activePlanetKey);
 
+            if (bodyColorTo && ringColorTo) {
+                bodyColorTo.set(bodyColors);
+                ringColorTo.set(ringColors);
+            }
+
             if (immediate) {
+                snapPlanetTransition();
                 bodyPositions.set(bodyTargets);
                 ringPositions.set(ringTargets);
                 bodyPoints.geometry.attributes.position.needsUpdate = true;
@@ -2573,6 +2579,13 @@
         function switchPlanet(key, immediate = false) {
             const planet = PLANETS[key];
             if (!planet) return;
+
+            const previousPlanetKey = activePlanetKey;
+            const animateTransition = !immediate && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;
+            if (animateTransition) {
+                bodyColorFrom.set(bodyColors);
+                ringColorFrom.set(ringColors);
+            }
 
             activePlanetKey = key;
             activeStage = "planet";
@@ -2605,12 +2618,19 @@
             setRingTargets(planet);
             updateReadout(planet, key);
 
+            if (animateTransition) {
+                beginPlanetTransition(previousPlanetKey, key);
+            }
+
+            if (!animateTransition) {
+                if (bodyColorTo && ringColorTo) {
+                    bodyColorTo.set(bodyColors);
+                    ringColorTo.set(ringColors);
+                }
+                snapPlanetTransition();
+            }
+
             if (immediate) {
-                bodyPositions.set(bodyTargets);
-                ringPositions.set(ringTargets);
-                bodyPoints.geometry.attributes.position.needsUpdate = true;
-                ringPoints.geometry.attributes.position.needsUpdate = true;
-                
                 if (ringMaterial) {
                     ringMaterial.uniforms.uOpacity.value = targetRingOpacity;
                 }

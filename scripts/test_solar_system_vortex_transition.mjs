@@ -48,5 +48,17 @@ assertMatches(
   /function snapPlanetTransition\(\) \{[\s\S]*planetTransition\.active = false;[\s\S]*planetTransition\.progress = 1;[\s\S]*bodyPositions\.set\(bodyTargets\);[\s\S]*ringPositions\.set\(ringTargets\);[\s\S]*bodyColors\.set\(bodyColorTo\);[\s\S]*ringColors\.set\(ringColorTo\);[\s\S]*bodyColorFrom\.set\(bodyColors\);[\s\S]*ringColorFrom\.set\(ringColors\);/,
   "transition completion snaps positions and colors"
 );
+assertMatches(
+  /function switchPlanet\(key, immediate = false\) \{[\s\S]*const previousPlanetKey = activePlanetKey;[\s\S]*const animateTransition = !immediate && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;[\s\S]*if \(animateTransition\) \{[\s\S]*bodyColorFrom\.set\(bodyColors\);[\s\S]*ringColorFrom\.set\(ringColors\);[\s\S]*beginPlanetTransition\(previousPlanetKey, key\);/,
+  "switchPlanet captures visible colors and starts transition"
+);
+assertMatches(
+  /if \(!animateTransition\) \{[\s\S]*if \(bodyColorTo && ringColorTo\) \{[\s\S]*bodyColorTo\.set\(bodyColors\);[\s\S]*ringColorTo\.set\(ringColors\);[\s\S]*snapPlanetTransition\(\);[\s\S]*\}/,
+  "non-animated switch snaps transition state"
+);
+assertMatches(
+  /function switchStage\(stage, immediate = false\) \{[\s\S]*bodyColorTo\.set\(bodyColors\);[\s\S]*ringColorTo\.set\(ringColors\);[\s\S]*if \(immediate\) \{[\s\S]*snapPlanetTransition\(\);/,
+  "immediate stage setup cancels transition"
+);
 
 console.log("Solar system vortex transition source checks passed.");
