@@ -2581,7 +2581,9 @@
             if (!planet) return;
 
             const previousPlanetKey = activePlanetKey;
-            const animateTransition = !immediate && previousPlanetKey !== key && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;
+            if (!immediate && previousPlanetKey === key) return;
+
+            const animateTransition = !immediate && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;
             if (animateTransition) {
                 bodyColorFrom.set(bodyColors);
                 ringColorFrom.set(ringColors);

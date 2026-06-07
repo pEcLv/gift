@@ -53,7 +53,7 @@ assertMatches(
   "transition completion snaps positions and colors"
 );
 assertMatches(
-  /function switchPlanet\(key, immediate = false\) \{[\s\S]*const previousPlanetKey = activePlanetKey;[\s\S]*const animateTransition = !immediate && previousPlanetKey !== key && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;[\s\S]*if \(animateTransition\) \{[\s\S]*bodyColorFrom\.set\(bodyColors\);[\s\S]*ringColorFrom\.set\(ringColors\);[\s\S]*beginPlanetTransition\(previousPlanetKey, key\);/,
+  /function switchPlanet\(key, immediate = false\) \{[\s\S]*const previousPlanetKey = activePlanetKey;[\s\S]*if \(!immediate && previousPlanetKey === key\) return;[\s\S]*const animateTransition = !immediate && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;[\s\S]*if \(animateTransition\) \{[\s\S]*bodyColorFrom\.set\(bodyColors\);[\s\S]*ringColorFrom\.set\(ringColors\);[\s\S]*beginPlanetTransition\(previousPlanetKey, key\);/,
   "switchPlanet captures visible colors and starts transition"
 );
 assertMatches(
