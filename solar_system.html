@@ -2581,7 +2581,7 @@
             if (!planet) return;
 
             const previousPlanetKey = activePlanetKey;
-            const animateTransition = !immediate && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;
+            const animateTransition = !immediate && previousPlanetKey !== key && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;
             if (animateTransition) {
                 bodyColorFrom.set(bodyColors);
                 ringColorFrom.set(ringColors);
@@ -2922,6 +2922,7 @@
             const delta = Math.min(Math.max(time - lastFrameTime, 0), 0.04);
             lastFrameTime = time;
             const planet = PLANETS[activePlanetKey];
+            updatePlanetTransition(time);
 
             if (activeStage !== "planet") targetGestureSpread = 0;
             if (gestureControl.mode === "fist") {

@@ -41,6 +41,10 @@ assertMatches(
   "transition progress, vortex weight, and color mix"
 );
 assertMatches(
+  /function animate\(\) \{[\s\S]*const time = clock\.getElapsedTime\(\);[\s\S]*const planet = PLANETS\[activePlanetKey\];\s*updatePlanetTransition\(time\);/,
+  "transition loop update"
+);
+assertMatches(
   /function mixTransitionColors\(\) \{[\s\S]*mixColorBuffer\(bodyColors, bodyColorFrom, bodyColorTo, planetTransition\.colorMix\);[\s\S]*mixColorBuffer\(ringColors, ringColorFrom, ringColorTo, planetTransition\.colorMix\);/,
   "visible color interpolation"
 );
@@ -49,7 +53,7 @@ assertMatches(
   "transition completion snaps positions and colors"
 );
 assertMatches(
-  /function switchPlanet\(key, immediate = false\) \{[\s\S]*const previousPlanetKey = activePlanetKey;[\s\S]*const animateTransition = !immediate && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;[\s\S]*if \(animateTransition\) \{[\s\S]*bodyColorFrom\.set\(bodyColors\);[\s\S]*ringColorFrom\.set\(ringColors\);[\s\S]*beginPlanetTransition\(previousPlanetKey, key\);/,
+  /function switchPlanet\(key, immediate = false\) \{[\s\S]*const previousPlanetKey = activePlanetKey;[\s\S]*const animateTransition = !immediate && previousPlanetKey !== key && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;[\s\S]*if \(animateTransition\) \{[\s\S]*bodyColorFrom\.set\(bodyColors\);[\s\S]*ringColorFrom\.set\(ringColors\);[\s\S]*beginPlanetTransition\(previousPlanetKey, key\);/,
   "switchPlanet captures visible colors and starts transition"
 );
 assertMatches(
