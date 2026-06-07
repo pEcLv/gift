@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Three.js粒子彗星 | 极致梦幻美学</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Helvetica Neue', 'Arial', sans-serif;
+            background: #020205;
+        }
+        #info {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            z-index: 100;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(10, 15, 30, 0.5);
+            padding: 12px 24px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            pointer-events: none;
+            font-size: 15px;
+            letter-spacing: 2px;
+            border-left: 4px solid #00f2fe;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            text-transform: uppercase;
+        }
+        #controls-tip {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            z-index: 100;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            letter-spacing: 1px;
+            pointer-events: none;
+            font-family: 'Courier New', monospace;
+        }
+        @keyframes floatIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        body {
+            animation: floatIn 2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        ✨ 极光彗星 | 宇宙深处的低语 ✨
+    </div>
+    <div id="controls-tip">
+        [ 鼠标拖拽旋转 | 滚轮缩放 | 沉浸式粒子美学 ]
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        
+        // --- 核心配置 ---
+        const config = {
+            bgColor: 0x020206,
+            fogColor: 0x020206,
+            fogDensity: 0.0015,
+            particleCount: 12000,
+            streamerCount: 2000,
+            tailLength: 18.0,
+            coreRadius: 0.35,
+            dir: new THREE.Vector3(-1, -0.15, 0.5).normalize(),
+            // 色相过渡: 0.52(青蓝) -> 0.85(粉紫)
+            hueStart: 0.52,
+            hueEnd: 0.85
+        };
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(config.bgColor);
+        scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(6, 4, 10);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制dpr以保证特效满帧
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0; // 【调低了曝光，使画面亮度减弱，更有氛围感】
+        document.body.appendChild(renderer.domElement);
+
+        // --- 极致泛光特效 (Cinematic Bloom) ---
+        const renderScene = new RenderPass(scene, camera);
+        // 【大幅调低了泛光强度，让它看起来不那么刺眼】
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.8, 0.15);
+        bloomPass.strength = 1.0; 
+        bloomPass.radius = 0.8;   
+        bloomPass.threshold = 0.1; 
+        const effectComposer = new EffectComposer(renderer);
+        effectComposer.addPass(renderScene);
+        effectComposer.addPass(bloomPass);
+
+        // --- 丝滑的轨道控制 ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.04;
+        controls.autoRotate = true; 
+        controls.autoRotateSpeed = 0.4;
+        controls.enableZoom = true;
+        controls.enablePan = false;
+        controls.target.set(0, 0, 0);
+        controls.maxDistance = 30;
+        controls.minDistance = 2;
+        
+        // --- 提取共用的柔和圆形粒子纹理 ---
+        // 这是解决“方块”问题的关键，所有的粒子（星星、流线、彗尾）都会使用这个贴图，变成发光柔和的圆形
+        const createSoftTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64; 
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.3, 'rgba(200,230,255,0.7)');
+            gradient.addColorStop(0.7, 'rgba(100,150,255,0.15)');
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        };
+        const softParticleTexture = createSoftTexture();
+
+        // --- 梦幻星空 ---
+        function createStarfield(count, size, color, radiusStart) {
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+            for (let i = 0; i < count; i++) {
+                const r = radiusStart + Math.random() * 50;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                pos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+                pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+                pos[i*3+2] = r * Math.cos(phi);
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const mat = new THREE.PointsMaterial({
+                color: color, 
+                size: size, 
+                transparent: true, 
+                opacity: Math.random() * 0.5 + 0.3,
+                blending: THREE.AdditiveBlending, 
+                sizeAttenuation: true,
+                map: softParticleTexture, // 【应用软圆形贴图，告别方块】
+                depthWrite: false
+            });
+            return new THREE.Points(geo, mat);
+        }
+        // 因为加入了边缘透明的贴图，为了视觉大小一致，稍微把尺寸调大了一点
+        const stars1 = createStarfield(3000, 0.15, 0xffffff, 40); 
+        const stars2 = createStarfield(1500, 0.25, 0x88ccff, 60);
+        scene.add(stars1);
+        scene.add(stars2);
+        
+        // --- 彗尾计算基向量 ---
+        const upRef = new THREE.Vector3(0, 1, 0);
+        const tangent1 = new THREE.Vector3();
+        const tangent2 = new THREE.Vector3();
+        if (Math.abs(config.dir.dot(upRef)) > 0.999) tangent1.set(1, 0, 0);
+        else tangent1.crossVectors(upRef, config.dir).normalize();
+        tangent2.crossVectors(config.dir, tangent1).normalize();
+        
+        // --- 极光彗尾系统 ---
+        class ParticleData {
+            constructor() {
+                this.d = Math.random() * config.tailLength; 
+                this.speed = 0.03 + Math.random() * 0.06;
+                this.radX = (Math.random() - 0.5) * 1.5;
+                this.radY = (Math.random() - 0.5) * 1.5;
+                this.radiusScale = 0.2 + Math.random() * 0.8;
+                this.phase = Math.random() * Math.PI * 2; // 用于随时间波动的相位
+            }
+        }
+        
+        const particlesData = new Array(config.particleCount);
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(config.particleCount * 3);
+        const colors = new Float32Array(config.particleCount * 3);
+        
+        for (let i = 0; i < config.particleCount; i++) {
+            particlesData[i] = new ParticleData();
+        }
+        
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        
+        const particleMaterial = new THREE.PointsMaterial({
+            size: 0.22, 
+            map: softParticleTexture, 
+            vertexColors: true,
+            transparent: true, 
+            opacity: 0.7, // 降低了一点主尾巴的透明度，避免过度明亮堆积
+            blending: THREE.AdditiveBlending,
+            depthWrite: false, 
+            sizeAttenuation: true
+        });
+        const cometTail = new THREE.Points(geometry, particleMaterial);
+        scene.add(cometTail);
+
+        // --- 核心晶体光晕 ---
+        const coreMaterial = new THREE.MeshStandardMaterial({
+            color: 0xccffff, emissive: 0x00f2fe, emissiveIntensity: 1.5, // 降低核心自发光强度
+            metalness: 0.1, roughness: 0.1
+        });
+        const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(config.coreRadius, 32, 32), coreMaterial);
+        scene.add(coreSphere);
+        
+        const innerCoreMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending
+        });
+        const innerCore = new THREE.Mesh(new THREE.SphereGeometry(config.coreRadius * 0.7, 32, 32), innerCoreMat);
+        scene.add(innerCore);
+
+        // --- 核心爆发粒子 ---
+        const sparkGeo = new THREE.BufferGeometry();
+        const sparkPos = new Float32Array(500 * 3);
+        for(let i=0; i<500; i++) {
+            sparkPos[i*3] = (Math.random()-0.5)*1.5;
+            sparkPos[i*3+1] = (Math.random()-0.5)*1.5;
+            sparkPos[i*3+2] = (Math.random()-0.5)*1.5;
+        }
+        sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+        const sparkMat = new THREE.PointsMaterial({
+            color: 0x4facfe, 
+            size: 0.1, 
+            map: softParticleTexture, // 【应用软圆形贴图】
+            transparent: true, 
+            opacity: 0.8, 
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const sparks = new THREE.Points(sparkGeo, sparkMat);
+        scene.add(sparks);
+
+        // --- 流线能量体 (螺旋交织特效) ---
+        const streamerData = [];
+        const streamerGeo = new THREE.BufferGeometry();
+        const streamerPos = new Float32Array(config.streamerCount * 3);
+        for (let i = 0; i < config.streamerCount; i++) {
+            streamerData.push({
+                d: Math.random() * config.tailLength,
+                speed: 0.04 + Math.random() * 0.06,
+                angle: Math.random() * Math.PI * 2,
+                radius: 0.1 + Math.random() * 0.8,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+        streamerGeo.setAttribute('position', new THREE.BufferAttribute(streamerPos, 3));
+        const streamerMat = new THREE.PointsMaterial({
+            color: 0xfa709a, 
+            size: 0.12, 
+            map: softParticleTexture, // 【应用软圆形贴图】
+            transparent: true, 
+            opacity: 0.5, 
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const streamers = new THREE.Points(streamerGeo, streamerMat);
+        scene.add(streamers);
+
+        // --- 极致光照 ---
+        scene.add(new THREE.AmbientLight(0x0a0a2a));
+        const coreLight = new THREE.PointLight(0x00f2fe, 1.5, 15); // 降低点光源强度
+        scene.add(coreLight);
+        const rimLight = new THREE.DirectionalLight(0xfa709a, 1.0); // 降低轮廓光强度
+        rimLight.position.set(-2, 2, -3);
+        scene.add(rimLight);
+
+        // --- 动画引擎 ---
+        const clock = new THREE.Clock();
+        const tempColor = new THREE.Color();
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+            const delta = 0.016; 
+            
+            // 核心律动
+            const pulse = 1 + Math.sin(time * 8) * 0.04;
+            coreSphere.scale.setScalar(pulse);
+            innerCore.scale.setScalar(1 + Math.sin(time * 12) * 0.06);
+            coreLight.intensity = 1.2 + Math.sin(time * 6) * 0.3; 
+
+            // 星空与碎片漂移
+            stars1.rotation.y = time * 0.01;
+            stars2.rotation.y = time * 0.015;
+            stars2.rotation.x = time * 0.005;
+            sparks.rotation.z = time * 1.5;
+            sparks.rotation.y = time * 1.0;
+            
+            // 极光彗尾波动计算 (引入正弦波扰动)
+            const posAttr = geometry.attributes.position.array;
+            const colAttr = geometry.attributes.color.array;
+            
+            for (let i = 0; i < config.particleCount; i++) {
+                const data = particlesData[i];
+                data.d += data.speed;
+                if (data.d > config.tailLength) {
+                    data.d = 0;
+                    data.speed = 0.03 + Math.random() * 0.06;
+                    data.radX = (Math.random() - 0.5) * 1.8;
+                    data.radY = (Math.random() - 0.5) * 1.8;
+                }
+                
+                const t = data.d / config.tailLength; // 0 到 1
+                
+                // 加入正弦波形干扰，使尾巴像极光一样飘动
+                const waveX = Math.sin(data.d * 0.8 - time * 3 + data.phase) * 0.3 * t;
+                const waveY = Math.cos(data.d * 0.6 - time * 2.5 + data.phase) * 0.3 * t;
+                
+                const spread = t * 1.5 * data.radiusScale;
+                const offX = tangent1.x * (data.radX * spread + waveX) + tangent2.x * (data.radY * spread + waveY);
+                const offY = tangent1.y * (data.radX * spread + waveX) + tangent2.y * (data.radY * spread + waveY);
+                const offZ = tangent1.z * (data.radX * spread + waveX) + tangent2.z * (data.radY * spread + waveY);
+                
+                posAttr[i*3] = config.dir.x * data.d + offX;
+                posAttr[i*3+1] = config.dir.y * data.d + offY;
+                posAttr[i*3+2] = config.dir.z * data.d + offZ;
+                
+                // 极致渐变色: 青色 -> 亮蓝 -> 粉紫
+                let hue = config.hueStart + (config.hueEnd - config.hueStart) * Math.pow(t, 0.8);
+                let sat = 0.9 - t * 0.2;
+                let light = 1.0 * (1.0 - t * 0.8) + 0.1; // 降低基础亮度
+                
+                tempColor.setHSL(hue, sat, Math.min(1.0, light));
+                colAttr[i*3] = tempColor.r;
+                colAttr[i*3+1] = tempColor.g;
+                colAttr[i*3+2] = tempColor.b;
+            }
+            geometry.attributes.position.needsUpdate = true;
+            geometry.attributes.color.needsUpdate = true;
+
+            // 流线计算 (能量丝螺旋环绕)
+            const stPos = streamerGeo.attributes.position.array;
+            for(let i=0; i<config.streamerCount; i++){
+                const data = streamerData[i];
+                data.d += data.speed;
+                if(data.d > config.tailLength){
+                    data.d = 0;
+                    data.speed = 0.04 + Math.random() * 0.06;
+                    data.angle = Math.random() * Math.PI * 2;
+                }
+                const t = data.d / config.tailLength;
+                
+                // 随距离增大螺旋半径
+                const r = data.radius * t * 2.5;
+                // 随时间绕轴心快速旋转
+                const currentAngle = data.angle + time * 3.0 + data.phase;
+                
+                const offX = tangent1.x * Math.cos(currentAngle) * r + tangent2.x * Math.sin(currentAngle) * r;
+                const offY = tangent1.y * Math.cos(currentAngle) * r + tangent2.y * Math.sin(currentAngle) * r;
+                const offZ = tangent1.z * Math.cos(currentAngle) * r + tangent2.z * Math.sin(currentAngle) * r;
+                
+                stPos[i*3] = config.dir.x * data.d + offX;
+                stPos[i*3+1] = config.dir.y * data.d + offY;
+                stPos[i*3+2] = config.dir.z * data.d + offZ;
+            }
+            streamerGeo.attributes.position.needsUpdate = true;
+
+            controls.update();
+            effectComposer.render();
+        }
+        
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            effectComposer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

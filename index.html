@@ -93,8 +93,8 @@
     </style>
 </head>
 <body>
-    <iframe class="scene-frame" data-scene="tree" src="christmas_tree_scene.html" title="粒子圣诞树"></iframe>
-    <iframe class="scene-frame" data-scene="planet" src="solar_system.html?embed=1" title="粒子太阳系" allow="camera; fullscreen"></iframe>
+    <iframe class="scene-frame" data-scene="tree" data-src="christmas_tree_scene.html" title="粒子圣诞树" allow="camera; fullscreen"></iframe>
+    <iframe class="scene-frame" data-scene="planet" data-src="solar_system.html?embed=1&amp;stage=planet" title="粒子太阳系" allow="camera; fullscreen"></iframe>
 
     <nav class="global-switch" aria-label="主场景切换">
         <button class="switch-button" type="button" data-scene="tree">圣诞树</button>
@@ -105,18 +105,29 @@
         const params = new URLSearchParams(window.location.search);
         const requestedScene = params.get("scene");
         const defaultScene = ["tree", "planet"].includes(requestedScene) ? requestedScene : "tree";
+        const sceneFrames = Array.from(document.querySelectorAll(".scene-frame"));
+        const switchButtons = Array.from(document.querySelectorAll(".switch-button"));
+
+        function loadScene(scene) {
+            const frame = sceneFrames.find((item) => item.dataset.scene === scene);
+            if (frame && !frame.getAttribute("src")) {
+                frame.src = frame.dataset.src;
+            }
+        }
 
         function switchScene(scene) {
-            document.querySelectorAll(".scene-frame").forEach((frame) => {
+            loadScene(scene);
+
+            sceneFrames.forEach((frame) => {
                 frame.classList.toggle("active", frame.dataset.scene === scene);
             });
-            document.querySelectorAll(".switch-button").forEach((button) => {
+            switchButtons.forEach((button) => {
                 button.classList.toggle("active", button.dataset.scene === scene);
             });
             history.replaceState(null, "", `?scene=${scene}`);
         }
 
-        document.querySelectorAll(".switch-button").forEach((button) => {
+        switchButtons.forEach((button) => {
             button.addEventListener("click", () => switchScene(button.dataset.scene));
         });
 

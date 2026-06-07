@@ -45,14 +45,6 @@
             pointer-events: none;
         }
 
-        body[data-stage="tree"]::before {
-            background:
-                radial-gradient(circle at 20% 28%, rgba(192, 48, 45, 0.2), transparent 28%),
-                radial-gradient(circle at 76% 42%, rgba(34, 118, 92, 0.22), transparent 34%),
-                radial-gradient(circle at 50% 110%, rgba(240, 191, 98, 0.18), transparent 42%),
-                linear-gradient(150deg, #07050a 0%, #07150f 50%, #020309 100%);
-        }
-
         #scene {
             position: fixed;
             inset: 0;
@@ -148,22 +140,6 @@
             transition: opacity 240ms ease, transform 240ms ease;
         }
 
-        .tree-readout {
-            right: 34px;
-            top: 30px;
-            width: 292px;
-            padding: 18px 18px 16px;
-            border: 1px solid rgba(103, 222, 153, 0.28);
-            border-radius: 8px;
-            background: linear-gradient(180deg, rgba(6, 20, 14, 0.82), rgba(6, 8, 10, 0.66));
-            backdrop-filter: blur(18px);
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38), inset 0 0 24px rgba(42, 148, 93, 0.08);
-            opacity: 0;
-            transform: translateY(-8px);
-            pointer-events: none;
-            transition: opacity 240ms ease, transform 240ms ease;
-        }
-
         .readout-top {
             display: flex;
             align-items: center;
@@ -177,11 +153,6 @@
             background: var(--active-planet, #e6aa56);
             box-shadow: 0 0 26px var(--active-glow, rgba(240, 191, 98, 0.45));
             flex: 0 0 auto;
-        }
-
-        .tree-swatch {
-            background: radial-gradient(circle at 40% 35%, #fff7c9, #f0bf62 42%, #2f9b61 70%, #16472e);
-            box-shadow: 0 0 28px rgba(103, 222, 153, 0.44);
         }
 
         #planet-name {
@@ -227,6 +198,36 @@
         }
 
         .metric-label {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: 1.4px;
+        }
+
+        .ephemeris-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(134, 214, 255, 0.2);
+        }
+
+        .ephemeris-cell {
+            min-width: 0;
+        }
+
+        .ephemeris-value {
+            display: block;
+            color: #d6f0ff;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ephemeris-label {
             display: block;
             margin-top: 3px;
             color: var(--muted);
@@ -312,19 +313,6 @@
             cursor: pointer;
             backdrop-filter: blur(14px);
             transition: transform 180ms ease, color 180ms ease, border-color 180ms ease;
-        }
-
-        body[data-stage="tree"] .planet-readout,
-        body[data-stage="tree"] .planet-nav {
-            opacity: 0;
-            transform: translateY(8px);
-            pointer-events: none;
-        }
-
-        body[data-stage="tree"] .tree-readout {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: auto;
         }
 
         .fullscreen-button:hover {
@@ -484,10 +472,6 @@
             box-shadow: inset 0 0 18px color-mix(in srgb, var(--token-color, var(--blue)) 18%, transparent);
         }
 
-        body[data-stage="tree"] .gesture-panel {
-            opacity: 0.42;
-        }
-
         #loader {
             position: fixed;
             inset: 0;
@@ -528,15 +512,6 @@
                 padding: 14px;
             }
 
-            .tree-readout {
-                left: 20px;
-                right: auto;
-                top: auto;
-                bottom: 104px;
-                width: calc(100vw - 40px);
-                padding: 14px;
-            }
-
             .mode-switch {
                 top: 18px;
                 left: 50%;
@@ -569,11 +544,13 @@
         }
 
         @media (max-width: 520px) {
-            .planet-readout {
-                display: none;
+            .mode-switch {
+                top: 92px;
+                left: 20px;
+                transform: none;
             }
 
-            .tree-readout {
+            .planet-readout {
                 display: none;
             }
 
@@ -594,7 +571,7 @@
                 left: 18px;
                 right: 18px;
                 top: auto;
-                bottom: 104px;
+                bottom: 132px;
                 width: auto;
             }
 
@@ -621,11 +598,6 @@
             <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
         </svg>
     </button>
-
-    <div class="chrome mode-switch" id="mode-switch" aria-label="展示模式">
-        <button class="mode-tab" type="button" data-stage="tree">圣诞树</button>
-        <button class="mode-tab active" type="button" data-stage="planet">星球</button>
-    </div>
 
     <header class="chrome title-block">
         <div class="eyebrow" id="stage-eyebrow">Particle Solar System</div>
@@ -655,29 +627,18 @@
                 <span class="metric-label">自转</span>
             </span>
         </div>
-    </aside>
-
-    <aside class="chrome tree-readout" id="tree-readout">
-        <div class="readout-top">
-            <span class="readout-swatch tree-swatch"></span>
-            <div>
-                <div id="tree-name">圣诞树</div>
-                <div id="tree-en">Holiday Tree</div>
-            </div>
-        </div>
-        <p id="tree-summary">松绿色枝层、金色灯带和红色饰球各自成型，和星球粒子样式分离。</p>
-        <div class="metrics">
-            <span class="metric">
-                <span class="metric-value">松绿粒子</span>
-                <span class="metric-label">主体</span>
+        <div class="ephemeris-strip">
+            <span class="ephemeris-cell">
+                <span class="ephemeris-value" id="ephemeris-date">--</span>
+                <span class="ephemeris-label">历元</span>
             </span>
-            <span class="metric">
-                <span class="metric-value">暖金灯带</span>
-                <span class="metric-label">光效</span>
+            <span class="ephemeris-cell">
+                <span class="ephemeris-value" id="ephemeris-distance">--</span>
+                <span class="ephemeris-label">日距</span>
             </span>
-            <span class="metric">
-                <span class="metric-value">红金饰球</span>
-                <span class="metric-label">点缀</span>
+            <span class="ephemeris-cell">
+                <span class="ephemeris-value" id="ephemeris-longitude">--</span>
+                <span class="ephemeris-label">黄经</span>
             </span>
         </div>
     </aside>
@@ -723,7 +684,9 @@
         import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
         import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
-        const EMBEDDED = new URLSearchParams(window.location.search).has("embed");
+        const params = new URLSearchParams(window.location.search);
+        const EMBEDDED = params.has("embed");
+        const defaultStage = "planet";
         if (EMBEDDED) {
             document.body.classList.add("embedded");
         }
@@ -876,14 +839,102 @@
             }
         };
 
+        const ORBIT_ELEMENTS = {
+            mercury: {
+                a: [0.38709843, 0.00000000],
+                e: [0.20563661, 0.00002123],
+                i: [7.00559432, -0.00590158],
+                L: [252.25166724, 149472.67486623],
+                peri: [77.45771895, 0.15940013],
+                node: [48.33961819, -0.12214182]
+            },
+            venus: {
+                a: [0.72332102, -0.00000026],
+                e: [0.00676399, -0.00005107],
+                i: [3.39777545, 0.00043494],
+                L: [181.97970850, 58517.81560260],
+                peri: [131.76755713, 0.05679648],
+                node: [76.67261496, -0.27274174]
+            },
+            earth: {
+                a: [1.00000018, -0.00000003],
+                e: [0.01673163, -0.00003661],
+                i: [-0.00054346, -0.01337178],
+                L: [100.46691572, 35999.37306329],
+                peri: [102.93005885, 0.31795260],
+                node: [-5.11260389, -0.24123856]
+            },
+            mars: {
+                a: [1.52371243, 0.00000097],
+                e: [0.09336511, 0.00009149],
+                i: [1.85181869, -0.00724757],
+                L: [-4.56813164, 19140.29934243],
+                peri: [-23.91744784, 0.45223625],
+                node: [49.71320984, -0.26852431]
+            },
+            jupiter: {
+                a: [5.20248019, -0.00002864],
+                e: [0.04853590, 0.00018026],
+                i: [1.29861416, -0.00322699],
+                L: [34.33479152, 3034.90371757],
+                peri: [14.27495244, 0.18199196],
+                node: [100.29282654, 0.13024619],
+                correction: [-0.00012452, 0.06064060, -0.35635438, 38.35125000]
+            },
+            saturn: {
+                a: [9.54149883, -0.00003065],
+                e: [0.05550825, -0.00032044],
+                i: [2.49424102, 0.00451969],
+                L: [50.07571329, 1222.11494724],
+                peri: [92.86136063, 0.54179478],
+                node: [113.63998702, -0.25015002],
+                correction: [0.00025899, -0.13434469, 0.87320147, 38.35125000]
+            },
+            uranus: {
+                a: [19.18797948, -0.00020455],
+                e: [0.04685740, -0.00001550],
+                i: [0.77298127, -0.00180155],
+                L: [314.20276625, 428.49512595],
+                peri: [172.43404441, 0.09266985],
+                node: [73.96250215, 0.05739699],
+                correction: [0.00058331, -0.97731848, 0.17689245, 7.67025000]
+            },
+            neptune: {
+                a: [30.06952752, 0.00006447],
+                e: [0.00895439, 0.00000818],
+                i: [1.77005520, 0.00022400],
+                L: [304.22289287, 218.46515314],
+                peri: [46.68158724, 0.01009938],
+                node: [131.78635853, -0.00606302],
+                correction: [-0.00041348, 0.68346318, -0.10162547, 7.67025000]
+            }
+        };
+
         const PLANET_ORDER = ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"];
         const BODY_COUNT = 65000;
         const RING_COUNT = 55000;
         const STAR_COUNT = 1900;
+        const COMET_PARTICLE_COUNT = 4200;
+        const COMET_STREAMER_COUNT = 900;
+        const COMET_SPARK_COUNT = 280;
+        const COMET_TAIL_LENGTH = 17.5;
+        const COMET_CORE_RADIUS = 0.32;
+        const COMET_ORIGIN = new THREE.Vector3(-13.2, 5.2, -13.8);
+        const COMET_DIRECTION = new THREE.Vector3(1, 0.22, 0.34).normalize();
+        const ORBIT_SCALE = 1.12;
+        const ORRERY_CENTER = new THREE.Vector3(0, -4.8, -3.4);
+        const ORRERY_DATE = new Date();
+        const JULIAN_UNIX_EPOCH = 2440587.5;
+        const J2000_JD = 2451545.0;
+        const MS_PER_DAY = 86400000;
+        const DEG_TO_RAD = Math.PI / 180;
+        const RAD_TO_DEG = 180 / Math.PI;
         const MIN_CAMERA_DISTANCE = 0.65;
         const MAX_CAMERA_DISTANCE = 44;
         const CAMERA_DEFAULT_Y = 2.1;
         const CAMERA_CENTERING_DISTANCE = 10;
+        const SHOW_ORBIT_LINES = false;
+        const SHOW_COMPANION_PLANETS = false;
         const clock = new THREE.Clock();
 
         let scene, camera, renderer, composer;
@@ -920,6 +971,11 @@
 
         let orbitLinesGroup;
         let nebulaPoints;
+        let cometGroup, cometTailPoints, cometStreamerPoints, cometSparkPoints, cometCoreMesh, cometInnerCoreMesh, cometLight;
+        let cometTailPositions, cometTailColors, cometStreamerPositions;
+        const cometTailData = [];
+        const cometStreamerData = [];
+        const cometTempColor = new THREE.Color();
         const targetMouse3D = new THREE.Vector3();
         const currentMouse3D = new THREE.Vector3();
         let mouseIntensityTarget = 0.0;
@@ -1203,6 +1259,8 @@
             }
         `;
 
+        const stageTitle = document.getElementById("stage-title");
+        const stageEyebrow = document.getElementById("stage-eyebrow");
         const cameraPreview = document.getElementById("camera-preview");
         const handOverlay = document.getElementById("hand-overlay");
         const handOverlayContext = handOverlay.getContext("2d");
@@ -1227,10 +1285,12 @@
             setupPlanetParticles();
             setupAtmosphere();
             setupPlanetShell();
+            setupOrbitLines();
             setupNebula();
+            setupComet();
             setupCompanionPlanets();
             setupUI();
-            switchStage("planet", true);
+            switchStage(defaultStage, true);
             setupEvents();
             animate();
 
@@ -1417,18 +1477,19 @@
         }
 
         function setupCompanionPlanets() {
-            PLANET_ORDER.forEach((key, index) => {
+            PLANET_ORDER.forEach((key) => {
                 const planet = PLANETS[key];
+                const orbitalState = computeOrbitalState(key, ORRERY_DATE);
+                const scenePosition = toOrreryPosition(orbitalState);
                 const pivot = new THREE.Group();
                 pivot.userData.key = key;
-                pivot.userData.offset = index * 0.78 + Math.random() * 0.2;
-                pivot.userData.speed = 0.055 + index * 0.008;
-                pivot.userData.orbitRadius = 14.5 + index * 1.15;
+                pivot.userData.orbitalState = orbitalState;
+                pivot.userData.basePosition = scenePosition;
 
                 const compMaterial = new THREE.ShaderMaterial({
                     uniforms: {
                         uColor: { value: new THREE.Color(planet.color) },
-                        uGlowIntensity: { value: 0.65 }
+                        uGlowIntensity: { value: key === activePlanetKey ? 1.15 : 0.65 }
                     },
                     vertexShader: `
                         varying vec3 vNormal;
@@ -1456,12 +1517,27 @@
                 });
 
                 const body = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.28 + planet.radius * 0.055, 24, 16),
+                    new THREE.SphereGeometry(0.3 + planet.radius * 0.048, 24, 16),
                     compMaterial
                 );
                 body.userData.key = key;
                 pivot.add(body);
                 companionObjects.push(body);
+
+                const halo = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.52 + planet.radius * 0.06, 0.012, 8, 96),
+                    new THREE.MeshBasicMaterial({
+                        color: new THREE.Color(planet.color),
+                        transparent: true,
+                        opacity: key === activePlanetKey ? 0.46 : 0.0,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    })
+                );
+                halo.rotation.x = Math.PI / 2;
+                halo.userData.kind = "selectionHalo";
+                pivot.add(halo);
+                pivot.userData.halo = halo;
 
                 if (planet.ring) {
                     const ring = new THREE.Mesh(
@@ -1476,6 +1552,7 @@
                     pivot.add(ring);
                 }
 
+                pivot.position.copy(scenePosition);
                 companionGroup.add(pivot);
             });
         }
@@ -1534,32 +1611,146 @@
         function setupOrbitLines() {
             orbitLinesGroup = new THREE.Group();
             scene.add(orbitLinesGroup);
-            
-            PLANET_ORDER.forEach((key, index) => {
+
+            const sunMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffcf6d,
+                transparent: true,
+                opacity: 0.94
+            });
+            const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(0.72, 36, 20), sunMaterial);
+            sunMesh.position.copy(ORRERY_CENTER);
+            orbitLinesGroup.add(sunMesh);
+
+            const sunGlow = new THREE.PointLight(0xffca75, 1.2, 38);
+            sunGlow.position.copy(ORRERY_CENTER);
+            orbitLinesGroup.add(sunGlow);
+
+            PLANET_ORDER.forEach((key) => {
                 const planet = PLANETS[key];
-                const orbitRadius = 14.5 + index * 1.15;
-                
-                const points = [];
-                const segments = 128;
-                for (let i = 0; i <= segments; i++) {
-                    const theta = (i / segments) * Math.PI * 2;
-                    const x = orbitRadius * Math.cos(theta);
-                    const y = -3.8 + Math.sin(theta * 1.7 + index) * 2.3;
-                    const z = orbitRadius * Math.sin(theta) - 5;
-                    points.push(new THREE.Vector3(x, y, z));
-                }
-                
+                const points = sampleOrbitPath(key, ORRERY_DATE, 260);
                 const geometry = new THREE.BufferGeometry().setFromPoints(points);
                 const material = new THREE.LineBasicMaterial({
                     color: new THREE.Color(planet.color),
                     transparent: true,
-                    opacity: 0.15,
+                    opacity: key === activePlanetKey ? 0.44 : 0.14,
                     blending: THREE.AdditiveBlending
                 });
                 
                 const line = new THREE.Line(geometry, material);
+                line.userData.key = key;
+                line.userData.kind = "orbitLine";
+                line.visible = SHOW_ORBIT_LINES;
                 orbitLinesGroup.add(line);
             });
+        }
+
+        function sampleOrbitPath(key, date, segments) {
+            const elements = orbitalElementsAt(key, date);
+            const points = [];
+            for (let i = 0; i <= segments; i++) {
+                const eccentricAnomaly = (i / segments) * Math.PI * 2;
+                const ecliptic = eclipticFromEccentricAnomaly(elements, eccentricAnomaly);
+                points.push(toOrreryPosition(ecliptic));
+            }
+            return points;
+        }
+
+        function computeOrbitalState(key, date) {
+            const elements = orbitalElementsAt(key, date);
+            const correction = ORBIT_ELEMENTS[key].correction || [0, 0, 0, 0];
+            const meanAnomalyDegrees = elements.L - elements.peri
+                + correction[0] * elements.T * elements.T
+                + correction[1] * Math.cos(DEG_TO_RAD * correction[3] * elements.T)
+                + correction[2] * Math.sin(DEG_TO_RAD * correction[3] * elements.T);
+            const meanAnomaly = normalizeRadians(meanAnomalyDegrees * DEG_TO_RAD);
+            const eccentricAnomaly = solveKepler(meanAnomaly, elements.e);
+            const ecliptic = eclipticFromEccentricAnomaly(elements, eccentricAnomaly);
+            const longitude = THREE.MathUtils.euclideanModulo(Math.atan2(ecliptic.y, ecliptic.x) * RAD_TO_DEG, 360);
+
+            return {
+                ...ecliptic,
+                distanceAu: Math.sqrt(ecliptic.x * ecliptic.x + ecliptic.y * ecliptic.y + ecliptic.z * ecliptic.z),
+                longitudeDeg: longitude,
+                eccentricAnomaly
+            };
+        }
+
+        function orbitalElementsAt(key, date) {
+            const source = ORBIT_ELEMENTS[key];
+            const T = (julianDate(date) - J2000_JD) / 36525;
+            const a = rateValue(source.a, T);
+            const e = rateValue(source.e, T);
+            const inclination = rateValue(source.i, T);
+            const L = rateValue(source.L, T);
+            const peri = rateValue(source.peri, T);
+            const node = rateValue(source.node, T);
+
+            return {
+                T,
+                a,
+                e,
+                inclination,
+                L,
+                peri,
+                node,
+                omega: peri - node
+            };
+        }
+
+        function eclipticFromEccentricAnomaly(elements, eccentricAnomaly) {
+            const orbitalX = elements.a * (Math.cos(eccentricAnomaly) - elements.e);
+            const orbitalY = elements.a * Math.sqrt(1 - elements.e * elements.e) * Math.sin(eccentricAnomaly);
+            const omega = elements.omega * DEG_TO_RAD;
+            const node = elements.node * DEG_TO_RAD;
+            const inclination = elements.inclination * DEG_TO_RAD;
+
+            const cosOmega = Math.cos(node);
+            const sinOmega = Math.sin(node);
+            const cosInclination = Math.cos(inclination);
+            const sinInclination = Math.sin(inclination);
+            const cosOmegaPeri = Math.cos(omega);
+            const sinOmegaPeri = Math.sin(omega);
+
+            return {
+                x: (cosOmegaPeri * cosOmega - sinOmegaPeri * sinOmega * cosInclination) * orbitalX
+                    + (-sinOmegaPeri * cosOmega - cosOmegaPeri * sinOmega * cosInclination) * orbitalY,
+                y: (cosOmegaPeri * sinOmega + sinOmegaPeri * cosOmega * cosInclination) * orbitalX
+                    + (-sinOmegaPeri * sinOmega + cosOmegaPeri * cosOmega * cosInclination) * orbitalY,
+                z: (sinOmegaPeri * sinInclination) * orbitalX
+                    + (cosOmegaPeri * sinInclination) * orbitalY
+            };
+        }
+
+        function solveKepler(meanAnomaly, eccentricity) {
+            let eccentricAnomaly = meanAnomaly;
+            for (let i = 0; i < 10; i++) {
+                const delta = (meanAnomaly - (eccentricAnomaly - eccentricity * Math.sin(eccentricAnomaly)))
+                    / (1 - eccentricity * Math.cos(eccentricAnomaly));
+                eccentricAnomaly += delta;
+                if (Math.abs(delta) < 1e-8) break;
+            }
+            return eccentricAnomaly;
+        }
+
+        function toOrreryPosition(ecliptic) {
+            return new THREE.Vector3(
+                ORRERY_CENTER.x + ecliptic.x * ORBIT_SCALE,
+                ORRERY_CENTER.y + ecliptic.z * ORBIT_SCALE,
+                ORRERY_CENTER.z + ecliptic.y * ORBIT_SCALE
+            );
+        }
+
+        function julianDate(date) {
+            return date.getTime() / MS_PER_DAY + JULIAN_UNIX_EPOCH;
+        }
+
+        function rateValue(pair, T) {
+            return pair[0] + pair[1] * T;
+        }
+
+        function normalizeRadians(angle) {
+            const tau = Math.PI * 2;
+            return ((angle + Math.PI) % tau + tau) % tau - Math.PI;
         }
 
         function setupNebula() {
@@ -1602,8 +1793,259 @@
             scene.add(nebulaPoints);
         }
 
+        function setupComet() {
+            const texture = createParticleTexture();
+            const basis = createCometBasis();
+
+            cometGroup = new THREE.Group();
+            cometGroup.position.copy(COMET_ORIGIN);
+            cometGroup.userData.tangentA = basis.tangentA;
+            cometGroup.userData.tangentB = basis.tangentB;
+            scene.add(cometGroup);
+
+            cometTailPositions = new Float32Array(COMET_PARTICLE_COUNT * 3);
+            cometTailColors = new Float32Array(COMET_PARTICLE_COUNT * 3);
+            for (let i = 0; i < COMET_PARTICLE_COUNT; i++) {
+                resetCometParticle(i, true);
+            }
+
+            const tailGeometry = new THREE.BufferGeometry();
+            tailGeometry.setAttribute("position", new THREE.BufferAttribute(cometTailPositions, 3));
+            tailGeometry.setAttribute("color", new THREE.BufferAttribute(cometTailColors, 3));
+
+            const tailMaterial = new THREE.PointsMaterial({
+                size: 0.25,
+                map: texture,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.58,
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
+                depthWrite: false,
+                sizeAttenuation: true
+            });
+
+            cometTailPoints = new THREE.Points(tailGeometry, tailMaterial);
+            cometTailPoints.renderOrder = 5;
+            cometGroup.add(cometTailPoints);
+
+            cometStreamerPositions = new Float32Array(COMET_STREAMER_COUNT * 3);
+            for (let i = 0; i < COMET_STREAMER_COUNT; i++) {
+                resetCometStreamer(i, true);
+            }
+
+            const streamerGeometry = new THREE.BufferGeometry();
+            streamerGeometry.setAttribute("position", new THREE.BufferAttribute(cometStreamerPositions, 3));
+
+            const streamerMaterial = new THREE.PointsMaterial({
+                color: 0xfa70b9,
+                size: 0.13,
+                map: texture,
+                transparent: true,
+                opacity: 0.46,
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
+                depthWrite: false,
+                sizeAttenuation: true
+            });
+
+            cometStreamerPoints = new THREE.Points(streamerGeometry, streamerMaterial);
+            cometStreamerPoints.renderOrder = 6;
+            cometGroup.add(cometStreamerPoints);
+
+            const sparkPositions = new Float32Array(COMET_SPARK_COUNT * 3);
+            for (let i = 0; i < COMET_SPARK_COUNT; i++) {
+                const p = randomScatter(COMET_CORE_RADIUS * 2.4);
+                sparkPositions[i * 3] = p.x;
+                sparkPositions[i * 3 + 1] = p.y;
+                sparkPositions[i * 3 + 2] = p.z;
+            }
+
+            const sparkGeometry = new THREE.BufferGeometry();
+            sparkGeometry.setAttribute("position", new THREE.BufferAttribute(sparkPositions, 3));
+
+            const sparkMaterial = new THREE.PointsMaterial({
+                color: 0x76e9ff,
+                size: 0.12,
+                map: texture,
+                transparent: true,
+                opacity: 0.72,
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
+                depthWrite: false,
+                sizeAttenuation: true
+            });
+
+            cometSparkPoints = new THREE.Points(sparkGeometry, sparkMaterial);
+            cometSparkPoints.renderOrder = 7;
+            cometGroup.add(cometSparkPoints);
+
+            cometCoreMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(COMET_CORE_RADIUS, 32, 20),
+                new THREE.MeshStandardMaterial({
+                    color: 0xccffff,
+                    emissive: 0x00f2fe,
+                    emissiveIntensity: 1.25,
+                    metalness: 0.08,
+                    roughness: 0.18,
+                    transparent: true,
+                    opacity: 0.92,
+                    depthTest: false,
+                    depthWrite: false
+                })
+            );
+            cometCoreMesh.renderOrder = 8;
+            cometGroup.add(cometCoreMesh);
+
+            cometInnerCoreMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(COMET_CORE_RADIUS * 0.62, 28, 18),
+                new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.86,
+                    blending: THREE.AdditiveBlending,
+                    depthTest: false,
+                    depthWrite: false
+                })
+            );
+            cometInnerCoreMesh.renderOrder = 9;
+            cometGroup.add(cometInnerCoreMesh);
+
+            cometLight = new THREE.PointLight(0x7df3ff, 1.1, 14);
+            cometGroup.add(cometLight);
+
+            updateComet(0, 1 / 60);
+        }
+
+        function createCometBasis() {
+            const up = new THREE.Vector3(0, 1, 0);
+            const tangentA = new THREE.Vector3();
+            const tangentB = new THREE.Vector3();
+            if (Math.abs(COMET_DIRECTION.dot(up)) > 0.999) {
+                tangentA.set(1, 0, 0);
+            } else {
+                tangentA.crossVectors(up, COMET_DIRECTION).normalize();
+            }
+            tangentB.crossVectors(COMET_DIRECTION, tangentA).normalize();
+            return { tangentA, tangentB };
+        }
+
+        function resetCometParticle(index, randomize = false) {
+            const data = cometTailData[index] || {};
+            data.d = randomize ? Math.random() * COMET_TAIL_LENGTH : 0;
+            data.speed = 0.028 + Math.random() * 0.052;
+            data.radialA = (Math.random() - 0.5) * 1.65;
+            data.radialB = (Math.random() - 0.5) * 1.65;
+            data.radiusScale = 0.24 + Math.random() * 0.86;
+            data.phase = Math.random() * Math.PI * 2;
+            cometTailData[index] = data;
+        }
+
+        function resetCometStreamer(index, randomize = false) {
+            const data = cometStreamerData[index] || {};
+            data.d = randomize ? Math.random() * COMET_TAIL_LENGTH : 0;
+            data.speed = 0.035 + Math.random() * 0.058;
+            data.angle = Math.random() * Math.PI * 2;
+            data.radius = 0.1 + Math.random() * 0.78;
+            data.phase = Math.random() * Math.PI * 2;
+            cometStreamerData[index] = data;
+        }
+
+        function updateComet(time, delta) {
+            if (!cometGroup) return;
+
+            cometGroup.visible = activeStage === "planet";
+            if (!cometGroup.visible) return;
+
+            const tangentA = cometGroup.userData.tangentA;
+            const tangentB = cometGroup.userData.tangentB;
+            const frameScale = delta * 60;
+
+            cometGroup.position.set(
+                COMET_ORIGIN.x + Math.sin(time * 0.08) * 1.25,
+                COMET_ORIGIN.y + Math.cos(time * 0.11) * 0.46,
+                COMET_ORIGIN.z + Math.sin(time * 0.05) * 0.7
+            );
+            cometGroup.rotation.z = Math.sin(time * 0.12) * 0.05;
+
+            const pulse = 1 + Math.sin(time * 7.4) * 0.045;
+            cometCoreMesh.scale.setScalar(pulse);
+            cometInnerCoreMesh.scale.setScalar(1 + Math.sin(time * 10.5) * 0.07);
+            cometLight.intensity = 0.9 + Math.sin(time * 5.2) * 0.22;
+            cometSparkPoints.rotation.z = time * 1.25;
+            cometSparkPoints.rotation.y = time * 0.85;
+
+            updateCometTailParticles(time, frameScale, tangentA, tangentB);
+            updateCometStreamers(time, frameScale, tangentA, tangentB);
+        }
+
+        function updateCometTailParticles(time, frameScale, tangentA, tangentB) {
+            const pos = cometTailPoints.geometry.attributes.position.array;
+            const col = cometTailPoints.geometry.attributes.color.array;
+
+            for (let i = 0; i < COMET_PARTICLE_COUNT; i++) {
+                const data = cometTailData[i];
+                data.d += data.speed * frameScale;
+                if (data.d > COMET_TAIL_LENGTH) {
+                    resetCometParticle(i);
+                }
+
+                const t = data.d / COMET_TAIL_LENGTH;
+                const spread = t * 1.42 * data.radiusScale;
+                const waveA = Math.sin(data.d * 0.86 - time * 2.7 + data.phase) * 0.28 * t;
+                const waveB = Math.cos(data.d * 0.64 - time * 2.2 + data.phase) * 0.28 * t;
+                const radialA = data.radialA * spread + waveA;
+                const radialB = data.radialB * spread + waveB;
+                const index = i * 3;
+
+                pos[index] = COMET_DIRECTION.x * data.d + tangentA.x * radialA + tangentB.x * radialB;
+                pos[index + 1] = COMET_DIRECTION.y * data.d + tangentA.y * radialA + tangentB.y * radialB;
+                pos[index + 2] = COMET_DIRECTION.z * data.d + tangentA.z * radialA + tangentB.z * radialB;
+
+                const hue = 0.52 + (0.85 - 0.52) * Math.pow(t, 0.82);
+                const saturation = 0.88 - t * 0.2;
+                const lightness = 0.86 * (1 - t * 0.78) + 0.12;
+                cometTempColor.setHSL(hue, saturation, Math.min(1, lightness));
+                col[index] = cometTempColor.r;
+                col[index + 1] = cometTempColor.g;
+                col[index + 2] = cometTempColor.b;
+            }
+
+            cometTailPoints.geometry.attributes.position.needsUpdate = true;
+            cometTailPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function updateCometStreamers(time, frameScale, tangentA, tangentB) {
+            const pos = cometStreamerPoints.geometry.attributes.position.array;
+
+            for (let i = 0; i < COMET_STREAMER_COUNT; i++) {
+                const data = cometStreamerData[i];
+                data.d += data.speed * frameScale;
+                if (data.d > COMET_TAIL_LENGTH) {
+                    resetCometStreamer(i);
+                }
+
+                const t = data.d / COMET_TAIL_LENGTH;
+                const r = data.radius * t * 2.25;
+                const angle = data.angle + time * 2.75 + data.phase;
+                const radialA = Math.cos(angle) * r;
+                const radialB = Math.sin(angle) * r;
+                const index = i * 3;
+
+                pos[index] = COMET_DIRECTION.x * data.d + tangentA.x * radialA + tangentB.x * radialB;
+                pos[index + 1] = COMET_DIRECTION.y * data.d + tangentA.y * radialA + tangentB.y * radialB;
+                pos[index + 2] = COMET_DIRECTION.z * data.d + tangentA.z * radialA + tangentB.z * radialB;
+            }
+
+            cometStreamerPoints.geometry.attributes.position.needsUpdate = true;
+        }
+
         function setupUI() {
             const nav = document.getElementById("planet-nav");
+
+            document.querySelectorAll(".mode-tab").forEach((button) => {
+                button.addEventListener("click", () => switchStage(button.dataset.stage));
+            });
 
             PLANET_ORDER.forEach((key) => {
                 const planet = PLANETS[key];
@@ -2048,62 +2490,39 @@
         }
 
         function switchStage(stage, immediate = false) {
-            if (stage !== "tree" && stage !== "planet") return;
+            if (stage !== "planet") return;
             activeStage = stage;
             updateStageUI();
 
             const planet = PLANETS[activePlanetKey];
 
-            if (stage === "tree") {
-                targetTilt = -0.08;
-                targetRingOpacity = 0.94;
-                document.documentElement.style.setProperty("--active-planet", "#67de99");
-                document.documentElement.style.setProperty("--active-glow", "rgba(103,222,153,0.42)");
-                
-                targetAtmosphereScale = 0.01;
-                targetAtmosphereColor.set("#67de99");
+            targetTilt = planet.tilt;
+            targetRingOpacity = planet.ring ? planet.ring.opacity : 0.0;
+            document.documentElement.style.setProperty("--active-planet", planet.color);
+            document.documentElement.style.setProperty("--active-glow", planet.glow);
+            
+            targetAtmosphereScale = planet.radius * planet.displayScale * 1.015;
+            targetAtmosphereColor.set(planet.color);
 
-                targetCoreScale = 0.01;
-                targetCoreOpacity = 0.0;
-                
-                if (bodyMaterial) {
-                    bodyMaterial.uniforms.uPlanetType.value = -1.0;
-                    bodyMaterial.uniforms.uSpinSpeed.value = 0.0011;
-                }
-                if (ringMaterial) {
-                    ringMaterial.uniforms.uPlanetType.value = -1.0;
-                }
-                
-                setTreeTargets();
-            } else {
-                targetTilt = planet.tilt;
-                targetRingOpacity = planet.ring ? planet.ring.opacity : 0.0;
-                document.documentElement.style.setProperty("--active-planet", planet.color);
-                document.documentElement.style.setProperty("--active-glow", planet.glow);
-                
-                targetAtmosphereScale = planet.radius * planet.displayScale * 1.015;
-                targetAtmosphereColor.set(planet.color);
-
-                targetCoreScale = planet.radius * planet.displayScale;
-                targetCoreOpacity = coreOpacityFor(planet);
-                
-                if (bodyMaterial) {
-                    bodyMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
-                    bodyMaterial.uniforms.uSpinSpeed.value = planet.spin;
-                }
-                if (ringMaterial) {
-                    ringMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
-                    if (planet.ring) {
-                        ringMaterial.uniforms.uRingSpeed.value = 0.04;
-                        ringMaterial.uniforms.uInnerRadius.value = planet.ring.inner;
-                        ringMaterial.uniforms.uOuterRadius.value = planet.ring.outer;
-                    }
-                }
-                
-                setBodyTargets(planet);
-                setRingTargets(planet);
-                updateReadout(planet, activePlanetKey);
+            targetCoreScale = planet.radius * planet.displayScale;
+            targetCoreOpacity = coreOpacityFor(planet);
+            
+            if (bodyMaterial) {
+                bodyMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
+                bodyMaterial.uniforms.uSpinSpeed.value = planet.spin;
             }
+            if (ringMaterial) {
+                ringMaterial.uniforms.uPlanetType.value = TYPE_MAP[planet.type];
+                if (planet.ring) {
+                    ringMaterial.uniforms.uRingSpeed.value = 0.04;
+                    ringMaterial.uniforms.uInnerRadius.value = planet.ring.inner;
+                    ringMaterial.uniforms.uOuterRadius.value = planet.ring.outer;
+                }
+            }
+            
+            setBodyTargets(planet);
+            setRingTargets(planet);
+            updateReadout(planet, activePlanetKey);
 
             if (immediate) {
                 bodyPositions.set(bodyTargets);
@@ -2126,6 +2545,8 @@
 
         function updateStageUI() {
             document.body.dataset.stage = activeStage;
+            stageTitle.textContent = "粒子太阳系";
+            stageEyebrow.textContent = "Particle Solar System";
             document.querySelectorAll(".mode-tab").forEach((button) => {
                 button.classList.toggle("active", button.dataset.stage === activeStage);
             });
@@ -2207,16 +2628,51 @@
         }
 
         function updateReadout(planet, key) {
+            const orbitalState = computeOrbitalState(key, ORRERY_DATE);
             document.getElementById("planet-name").textContent = planet.name;
             document.getElementById("planet-en").textContent = planet.en;
             document.getElementById("planet-summary").textContent = planet.summary;
             document.getElementById("metric-orbit").textContent = planet.orbit;
             document.getElementById("metric-radius").textContent = planet.radiusLabel;
             document.getElementById("metric-day").textContent = planet.day;
+            document.getElementById("ephemeris-date").textContent = formatOrreryDate(ORRERY_DATE);
+            document.getElementById("ephemeris-distance").textContent = `${orbitalState.distanceAu.toFixed(2)} AU`;
+            document.getElementById("ephemeris-longitude").textContent = `${orbitalState.longitudeDeg.toFixed(1)}°`;
 
             document.querySelectorAll(".planet-button").forEach((button) => {
                 button.classList.toggle("active", button.dataset.planet === key);
             });
+            updateOrreryFocus(key);
+        }
+
+        function updateOrreryFocus(key) {
+            if (!orbitLinesGroup || !companionGroup) return;
+
+            orbitLinesGroup.children.forEach((child) => {
+                if (child.userData.kind !== "orbitLine" || !child.material) return;
+                child.visible = SHOW_ORBIT_LINES;
+                child.material.opacity = child.userData.key === key ? 0.44 : 0.14;
+            });
+
+            companionGroup.children.forEach((pivot) => {
+                const selected = pivot.userData.key === key;
+                const body = pivot.children[0];
+                const halo = pivot.userData.halo;
+                if (body && body.material.uniforms) {
+                    body.material.uniforms.uGlowIntensity.value = selected ? 1.15 : 0.65;
+                }
+                if (halo) {
+                    halo.material.opacity = selected ? 0.46 : 0.0;
+                }
+            });
+        }
+
+        function formatOrreryDate(date) {
+            return new Intl.DateTimeFormat("zh-CN", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }).format(date);
         }
 
         function setBodyTargets(planet) {
@@ -2347,102 +2803,6 @@
             ringPoints.geometry.attributes.color.needsUpdate = true;
         }
 
-        function setTreeTargets() {
-            const color = new THREE.Color();
-            const treePalette = ["#2fa667", "#3fc77a", "#79efaa", "#d9b35f", "#f7e6a6"];
-            const ornamentPalette = ["#f0bf62", "#fff1b8", "#c63f36", "#e76f51", "#6fd6ff"];
-
-            for (let i = 0; i < BODY_COUNT; i++) {
-                const seed = bodySeeds[i];
-                const trunkCount = 760;
-                const topperCount = 360;
-
-                if (i < trunkCount) {
-                    const t = i / trunkCount;
-                    const angle = seed.theta;
-                    const r = 0.32 + seed.shell * 0.42;
-                    bodyTargets[i * 3] = Math.cos(angle) * r;
-                    bodyTargets[i * 3 + 1] = -7.4 + t * 2.1;
-                    bodyTargets[i * 3 + 2] = Math.sin(angle) * r;
-                    color.set(seed.noise > 0.42 ? "#7a4a2a" : "#b17638");
-                } else if (i > BODY_COUNT - topperCount) {
-                    const t = (i - (BODY_COUNT - topperCount)) / topperCount;
-                    const angle = seed.theta;
-                    const point = Math.floor(t * 5);
-                    const spoke = point * Math.PI * 0.4 - Math.PI / 2;
-                    const starRadius = (seed.shell * 0.9 + 0.18) * (seed.noise > 0.45 ? 1.0 : 0.46);
-                    bodyTargets[i * 3] = Math.cos(spoke + angle * 0.08) * starRadius;
-                    bodyTargets[i * 3 + 1] = 7.25 + Math.sin(spoke + angle * 0.08) * starRadius * 0.75;
-                    bodyTargets[i * 3 + 2] = (seed.noise - 0.5) * 0.34;
-                    color.set(seed.noise > 0.34 ? "#fff1b8" : "#f0bf62");
-                } else {
-                    const t = (i - trunkCount) / (BODY_COUNT - trunkCount - topperCount);
-                    const y = -5.85 + t * 12.1;
-                    const cone = Math.max(0.04, 1 - t);
-                    const branchStep = Math.floor(t * 11);
-                    const branchWave = 0.82 + 0.18 * Math.sin(branchStep * 2.2 + seed.theta * 3);
-                    const r = (0.42 + seed.shell * 0.72) * 5.85 * Math.pow(cone, 0.78) * branchWave;
-                    const angle = seed.theta + t * Math.PI * 17.6;
-                    bodyTargets[i * 3] = Math.cos(angle) * r;
-                    bodyTargets[i * 3 + 1] = y + Math.sin(seed.theta * 4.0) * 0.16;
-                    bodyTargets[i * 3 + 2] = Math.sin(angle) * r;
-
-                    const paletteIndex = Math.floor(seed.noise * treePalette.length) % treePalette.length;
-                    color.set(seed.noise > 0.86 ? "#f7e6a6" : treePalette[paletteIndex]);
-                }
-
-                bodyColors[i * 3] = color.r;
-                bodyColors[i * 3 + 1] = color.g;
-                bodyColors[i * 3 + 2] = color.b;
-            }
-
-            for (let i = 0; i < RING_COUNT; i++) {
-                const seed = ringSeeds[i];
-                const band = seed.radius;
-                let x, y, z;
-
-                if (i < 540) {
-                    const point = Math.floor(seed.band * 5);
-                    const spoke = point * Math.PI * 0.4 - Math.PI / 2;
-                    const r = 0.24 + seed.radius * 1.14;
-                    x = Math.cos(spoke + seed.angle * 0.05) * r;
-                    y = 7.28 + Math.sin(spoke + seed.angle * 0.05) * r * 0.72;
-                    z = seed.height * 0.32;
-                    color.set(seed.gap > 0.38 ? "#fff6cc" : "#f0bf62");
-                } else if (seed.gap < 0.68) {
-                    const yNorm = band;
-                    y = -5.62 + yNorm * 11.4;
-                    const cone = Math.max(0.06, 1 - yNorm);
-                    const r = 5.95 * Math.pow(cone, 0.8) + 0.16;
-                    const angle = yNorm * Math.PI * 13.2 + seed.angle * 0.18;
-                    x = Math.cos(angle) * r;
-                    z = Math.sin(angle) * r;
-                    color.set(seed.gap > 0.78 ? "#fff1b8" : "#f0bf62");
-                } else {
-                    const yNorm = seed.band;
-                    y = -5.15 + yNorm * 10.65;
-                    const cone = Math.max(0.09, 1 - yNorm);
-                    const r = (4.95 * Math.pow(cone, 0.82)) * (0.82 + seed.radius * 0.2);
-                    const angle = seed.angle + yNorm * Math.PI * 2.2;
-                    x = Math.cos(angle) * r;
-                    z = Math.sin(angle) * r;
-                    color.set(ornamentPalette[Math.floor(seed.gap * ornamentPalette.length) % ornamentPalette.length]);
-                }
-
-                ringTargets[i * 3] = x;
-                ringTargets[i * 3 + 1] = y;
-                ringTargets[i * 3 + 2] = z;
-                ringColors[i * 3] = color.r;
-                ringColors[i * 3 + 1] = color.g;
-                ringColors[i * 3 + 2] = color.b;
-            }
-
-            ringPoints.rotation.x = 0;
-            ringPoints.rotation.z = 0;
-            bodyPoints.geometry.attributes.color.needsUpdate = true;
-            ringPoints.geometry.attributes.color.needsUpdate = true;
-        }
-
         function animate() {
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
@@ -2467,18 +2827,16 @@
             // GPU uniform updates
             if (bodyMaterial) {
                 bodyMaterial.uniforms.uTime.value = time;
-                const bodySizeTarget = activeStage === "tree" ? 0.096 : 0.068;
-                bodyMaterial.uniforms.uSize.value = THREE.MathUtils.lerp(bodyMaterial.uniforms.uSize.value, bodySizeTarget, 0.08);
-                bodyPoints.rotation.y += activeStage === "planet" ? planet.spin * 0.3 : 0.0011;
+                bodyMaterial.uniforms.uSize.value = THREE.MathUtils.lerp(bodyMaterial.uniforms.uSize.value, 0.068, 0.08);
+                bodyPoints.rotation.y += planet.spin * 0.3;
             }
             
             if (ringMaterial) {
                 ringMaterial.uniforms.uTime.value = time;
-                const ringSizeTarget = activeStage === "tree" ? 0.076 : 0.055;
-                ringMaterial.uniforms.uSize.value = THREE.MathUtils.lerp(ringMaterial.uniforms.uSize.value, ringSizeTarget, 0.08);
+                ringMaterial.uniforms.uSize.value = THREE.MathUtils.lerp(ringMaterial.uniforms.uSize.value, 0.055, 0.08);
                 const nextOpacity = THREE.MathUtils.lerp(ringMaterial.uniforms.uOpacity.value, targetRingOpacity, 0.06);
                 ringMaterial.uniforms.uOpacity.value = nextOpacity;
-                ringPoints.rotation.z += activeStage === "planet" ? (planet.ring ? 0.0002 : 0.0001) : 0.0017;
+                ringPoints.rotation.z += planet.ring ? 0.0002 : 0.0001;
             }
 
             if (starPoints && starPoints.material.uniforms) {
@@ -2508,6 +2866,14 @@
             if (nebulaPoints) {
                 nebulaPoints.rotation.y += 0.00004;
             }
+            updateComet(time, delta);
+
+            if (orbitLinesGroup) {
+                orbitLinesGroup.visible = activeStage === "planet" && SHOW_COMPANION_PLANETS;
+            }
+            if (companionGroup) {
+                companionGroup.visible = activeStage === "planet" && SHOW_COMPANION_PLANETS;
+            }
 
             // Mouse interaction interpolation
             currentMouse3D.lerp(targetMouse3D, 0.1);
@@ -2517,9 +2883,9 @@
                 bodyMaterial.uniforms.uMouseIntensity.value = currentMouseIntensity;
             }
 
-            displayGroup.scale.setScalar(THREE.MathUtils.lerp(displayGroup.scale.x, activeStage === "tree" ? 1.12 : 1 + gestureSpread * 0.06, 0.06));
+            displayGroup.scale.setScalar(THREE.MathUtils.lerp(displayGroup.scale.x, 1 + gestureSpread * 0.06, 0.06));
 
-            manualRotY += activeStage === "planet" ? 0.0016 : 0.0012;
+            manualRotY += 0.0016;
             displayGroup.rotation.y = THREE.MathUtils.lerp(displayGroup.rotation.y, manualRotY, 0.035);
             displayGroup.rotation.x = THREE.MathUtils.lerp(displayGroup.rotation.x, manualRotX + targetTilt, 0.035);
 
@@ -2533,7 +2899,7 @@
             updateCompanions(time);
             starPoints.rotation.y += 0.00008;
 
-            composer.passes[1].strength = activeStage === "tree" ? 0.88 : (planet.ring ? 1.35 : 1.10);
+            composer.passes[1].strength = planet.ring ? 1.35 : 1.10;
             composer.render();
         }
 
@@ -2541,18 +2907,22 @@
             companionGroup.children.forEach((pivot, index) => {
                 const key = pivot.userData.key;
                 const planet = PLANETS[key];
-                const hidden = activeStage !== "planet" || key === activePlanetKey;
-                const angle = time * pivot.userData.speed + pivot.userData.offset;
-                const radius = pivot.userData.orbitRadius;
+                const hidden = activeStage !== "planet" || !SHOW_COMPANION_PLANETS;
+                const selected = key === activePlanetKey;
+                const basePosition = pivot.userData.basePosition;
                 pivot.visible = !hidden;
-                pivot.position.set(
-                    radius * Math.cos(angle),
-                    -3.8 + Math.sin(angle * 1.7 + index) * 2.3,
-                    radius * Math.sin(angle) - 5
-                );
-                const scale = key === "jupiter" || key === "saturn" ? 1.18 : 1;
-                pivot.scale.setScalar(scale);
+                pivot.position.copy(basePosition);
+                pivot.position.y += Math.sin(time * 0.95 + index) * 0.035;
+
+                const giantScale = key === "jupiter" || key === "saturn" ? 1.14 : 1;
+                const selectedPulse = selected ? 0.2 + Math.sin(time * 2.4) * 0.035 : 0;
+                pivot.scale.setScalar(giantScale + selectedPulse);
                 pivot.rotation.y += planet.spin * 1.8;
+
+                const halo = pivot.userData.halo;
+                if (halo) {
+                    halo.rotation.z += 0.006;
+                }
             });
         }
 
@@ -2590,7 +2960,7 @@
         }
 
         function pickCompanion(event) {
-            if (activeStage !== "planet") return null;
+            if (activeStage !== "planet" || !SHOW_COMPANION_PLANETS) return null;
             pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
             pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(pointer, camera);
