@@ -935,11 +935,14 @@
         const CAMERA_CENTERING_DISTANCE = 10;
         const SHOW_ORBIT_LINES = false;
         const SHOW_COMPANION_PLANETS = false;
+        const TRANSITION_DURATION = 1.1;
+        const TRANSITION_VORTEX_TILT = -0.34;
+        const TRANSITION_RING_TILT = -0.42;
         const clock = new THREE.Clock();
 
         let scene, camera, renderer, composer;
         let displayGroup, bodyPoints, ringPoints, starPoints, companionGroup;
-        let bodyPositions, bodyTargets, bodyColors, ringPositions, ringTargets, ringColors;
+        let bodyPositions, bodyTargets, bodyColors, bodyColorFrom, bodyColorTo, ringPositions, ringTargets, ringColors, ringColorFrom, ringColorTo;
         let activePlanetKey = "saturn";
         let activeStage = "planet";
         let targetTilt = PLANETS.saturn.tilt;
@@ -968,6 +971,17 @@
         let planetCoreMesh, planetCoreMaterial, depthMaskMesh;
         let targetCoreScale = 1.0;
         let targetCoreOpacity = 0.62;
+        const planetTransition = {
+            active: false,
+            startedAt: 0,
+            duration: TRANSITION_DURATION,
+            fromKey: "saturn",
+            toKey: "saturn",
+            progress: 1,
+            eased: 1,
+            vortexWeight: 0,
+            colorMix: 1
+        };
 
         let orbitLinesGroup;
         let nebulaPoints;
@@ -1383,6 +1397,8 @@
             bodyPositions = new Float32Array(BODY_COUNT * 3);
             bodyTargets = new Float32Array(BODY_COUNT * 3);
             bodyColors = new Float32Array(BODY_COUNT * 3);
+            bodyColorFrom = new Float32Array(BODY_COUNT * 3);
+            bodyColorTo = new Float32Array(BODY_COUNT * 3);
 
             for (let i = 0; i < BODY_COUNT; i++) {
                 bodySeeds.push({
@@ -1431,6 +1447,8 @@
             ringPositions = new Float32Array(RING_COUNT * 3);
             ringTargets = new Float32Array(RING_COUNT * 3);
             ringColors = new Float32Array(RING_COUNT * 3);
+            ringColorFrom = new Float32Array(RING_COUNT * 3);
+            ringColorTo = new Float32Array(RING_COUNT * 3);
 
             for (let i = 0; i < RING_COUNT; i++) {
                 ringSeeds.push({
