@@ -32,5 +32,21 @@ assertIncludes("bodyColorFrom = new Float32Array(BODY_COUNT * 3);", "body source
 assertIncludes("bodyColorTo = new Float32Array(BODY_COUNT * 3);", "body target color buffer allocation");
 assertIncludes("ringColorFrom = new Float32Array(RING_COUNT * 3);", "ring source color buffer allocation");
 assertIncludes("ringColorTo = new Float32Array(RING_COUNT * 3);", "ring target color buffer allocation");
+assertMatches(
+  /function beginPlanetTransition\(fromKey, toKey\) \{[\s\S]*planetTransition\.active = fromKey !== toKey;[\s\S]*planetTransition\.startedAt = clock\.getElapsedTime\(\);[\s\S]*bodyColorTo\.set\(bodyColors\);[\s\S]*ringColorTo\.set\(ringColors\);[\s\S]*bodyColors\.set\(bodyColorFrom\);[\s\S]*ringColors\.set\(ringColorFrom\);/,
+  "transition begin snapshots target colors and restores visible source colors"
+);
+assertMatches(
+  /function updatePlanetTransition\(time\) \{[\s\S]*planetTransition\.progress = progress;[\s\S]*planetTransition\.eased = THREE\.MathUtils\.smoothstep\(progress, 0, 1\);[\s\S]*planetTransition\.vortexWeight = Math\.sin\(progress \* Math\.PI\);[\s\S]*planetTransition\.colorMix = THREE\.MathUtils\.smoothstep\(progress, 0\.2, 0\.72\);/,
+  "transition progress, vortex weight, and color mix"
+);
+assertMatches(
+  /function mixTransitionColors\(\) \{[\s\S]*mixColorBuffer\(bodyColors, bodyColorFrom, bodyColorTo, planetTransition\.colorMix\);[\s\S]*mixColorBuffer\(ringColors, ringColorFrom, ringColorTo, planetTransition\.colorMix\);/,
+  "visible color interpolation"
+);
+assertMatches(
+  /function snapPlanetTransition\(\) \{[\s\S]*planetTransition\.active = false;[\s\S]*planetTransition\.progress = 1;[\s\S]*bodyPositions\.set\(bodyTargets\);[\s\S]*ringPositions\.set\(ringTargets\);[\s\S]*bodyColors\.set\(bodyColorTo\);[\s\S]*ringColors\.set\(ringColorTo\);/,
+  "transition completion snaps positions and colors"
+);
 
 console.log("Solar system vortex transition source checks passed.");

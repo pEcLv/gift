@@ -2645,6 +2645,79 @@
             }
         }
 
+        function beginPlanetTransition(fromKey, toKey) {
+            if (!bodyPoints || !ringPoints || !bodyColorFrom || !bodyColorTo || !ringColorFrom || !ringColorTo) return;
+
+            planetTransition.active = fromKey !== toKey;
+            planetTransition.startedAt = clock.getElapsedTime();
+            planetTransition.fromKey = fromKey;
+            planetTransition.toKey = toKey;
+            planetTransition.progress = 0;
+            planetTransition.eased = 0;
+            planetTransition.vortexWeight = 0;
+            planetTransition.colorMix = 0;
+
+            bodyColorTo.set(bodyColors);
+            ringColorTo.set(ringColors);
+            bodyColors.set(bodyColorFrom);
+            ringColors.set(ringColorFrom);
+
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function updatePlanetTransition(time) {
+            if (!planetTransition.active) return;
+
+            const progress = THREE.MathUtils.clamp((time - planetTransition.startedAt) / planetTransition.duration, 0, 1);
+            planetTransition.progress = progress;
+            planetTransition.eased = THREE.MathUtils.smoothstep(progress, 0, 1);
+            planetTransition.vortexWeight = Math.sin(progress * Math.PI);
+            planetTransition.colorMix = THREE.MathUtils.smoothstep(progress, 0.2, 0.72);
+
+            mixTransitionColors();
+
+            if (progress >= 1) {
+                snapPlanetTransition();
+            }
+        }
+
+        function mixTransitionColors() {
+            if (!bodyColorFrom || !bodyColorTo || !ringColorFrom || !ringColorTo) return;
+
+            mixColorBuffer(bodyColors, bodyColorFrom, bodyColorTo, planetTransition.colorMix);
+            mixColorBuffer(ringColors, ringColorFrom, ringColorTo, planetTransition.colorMix);
+
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function mixColorBuffer(visible, from, to, amount) {
+            for (let i = 0; i < visible.length; i++) {
+                visible[i] = from[i] + (to[i] - from[i]) * amount;
+            }
+        }
+
+        function snapPlanetTransition() {
+            planetTransition.active = false;
+            planetTransition.progress = 1;
+            planetTransition.eased = 1;
+            planetTransition.vortexWeight = 0;
+            planetTransition.colorMix = 1;
+
+            if (!bodyPoints || !ringPoints) return;
+
+            bodyPositions.set(bodyTargets);
+            ringPositions.set(ringTargets);
+            bodyColors.set(bodyColorTo);
+            ringColors.set(ringColorTo);
+
+            bodyPoints.geometry.attributes.position.needsUpdate = true;
+            ringPoints.geometry.attributes.position.needsUpdate = true;
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
         function updateReadout(planet, key) {
             const orbitalState = computeOrbitalState(key, ORRERY_DATE);
             document.getElementById("planet-name").textContent = planet.name;
