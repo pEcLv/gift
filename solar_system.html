@@ -3041,29 +3041,83 @@
         }
 
         function moveBodyAttribute(ease) {
+            const transitionActive = planetTransition.active;
+            const vortexWeight = planetTransition.vortexWeight;
+            const transitionSpin = planetTransition.eased * Math.PI * 1.65;
+            const tiltSin = Math.sin(TRANSITION_VORTEX_TILT);
+            const tiltCos = Math.cos(TRANSITION_VORTEX_TILT);
+
             for (let i = 0; i < BODY_COUNT; i++) {
                 const seed = bodySeeds[i];
                 const index = i * 3;
-                const spreadX = bodyTargets[index] * (0.5 + seed.shell * 1.35) + Math.cos(seed.orbit) * (1.8 + seed.noise * 3.2);
-                const spreadY = bodyTargets[index + 1] * (0.4 + seed.noise * 1.35) + Math.sin(seed.theta * 2.1) * 2.4;
-                const spreadZ = bodyTargets[index + 2] * (0.5 + seed.shell * 1.35) + Math.sin(seed.orbit) * (1.8 + seed.noise * 3.2);
-                bodyPositions[index] += (bodyTargets[index] + spreadX * gestureSpread - bodyPositions[index]) * ease;
-                bodyPositions[index + 1] += (bodyTargets[index + 1] + spreadY * gestureSpread - bodyPositions[index + 1]) * ease;
-                bodyPositions[index + 2] += (bodyTargets[index + 2] + spreadZ * gestureSpread - bodyPositions[index + 2]) * ease;
+                const baseX = bodyTargets[index];
+                const baseY = bodyTargets[index + 1];
+                const baseZ = bodyTargets[index + 2];
+                let targetX = baseX;
+                let targetY = baseY;
+                let targetZ = baseZ;
+
+                if (transitionActive && vortexWeight > 0.001) {
+                    const theta = seed.theta + seed.orbit + transitionSpin;
+                    const baseRadius = Math.sqrt(baseX * baseX + baseY * baseY + baseZ * baseZ);
+                    const vortexRadius = baseRadius * (1.02 + seed.shell * 0.34) + 1.25 + seed.noise * 1.9;
+                    const flatX = Math.cos(theta) * vortexRadius;
+                    const flatZ = Math.sin(theta) * vortexRadius;
+                    const flatY = baseY * 0.16 + Math.sin(theta * 2.0 + seed.noise * Math.PI * 2) * 0.62;
+                    const tiltedY = flatY * tiltCos - flatZ * tiltSin;
+                    const tiltedZ = flatY * tiltSin + flatZ * tiltCos;
+                    targetX = THREE.MathUtils.lerp(baseX, flatX, vortexWeight);
+                    targetY = THREE.MathUtils.lerp(baseY, tiltedY, vortexWeight);
+                    targetZ = THREE.MathUtils.lerp(baseZ, tiltedZ, vortexWeight);
+                }
+
+                const spreadX = baseX * (0.5 + seed.shell * 1.35) + Math.cos(seed.orbit) * (1.8 + seed.noise * 3.2);
+                const spreadY = baseY * (0.4 + seed.noise * 1.35) + Math.sin(seed.theta * 2.1) * 2.4;
+                const spreadZ = baseZ * (0.5 + seed.shell * 1.35) + Math.sin(seed.orbit) * (1.8 + seed.noise * 3.2);
+                bodyPositions[index] += (targetX + spreadX * gestureSpread - bodyPositions[index]) * ease;
+                bodyPositions[index + 1] += (targetY + spreadY * gestureSpread - bodyPositions[index + 1]) * ease;
+                bodyPositions[index + 2] += (targetZ + spreadZ * gestureSpread - bodyPositions[index + 2]) * ease;
             }
         }
 
         function moveRingAttribute(ease) {
+            const transitionActive = planetTransition.active;
+            const vortexWeight = planetTransition.vortexWeight;
+            const transitionSpin = planetTransition.eased * Math.PI * 1.45;
+            const tiltSin = Math.sin(TRANSITION_RING_TILT);
+            const tiltCos = Math.cos(TRANSITION_RING_TILT);
+
             for (let i = 0; i < RING_COUNT; i++) {
                 const seed = ringSeeds[i];
                 const index = i * 3;
+                const baseX = ringTargets[index];
+                const baseY = ringTargets[index + 1];
+                const baseZ = ringTargets[index + 2];
+                let targetX = baseX;
+                let targetY = baseY;
+                let targetZ = baseZ;
+
+                if (transitionActive && vortexWeight > 0.001) {
+                    const theta = seed.angle + transitionSpin + seed.band * Math.PI * 2;
+                    const baseRadius = Math.sqrt(baseX * baseX + baseZ * baseZ);
+                    const vortexRadius = baseRadius * (1.04 + seed.radius * 0.26) + 1.8 + seed.band * 2.8;
+                    const flatX = Math.cos(theta) * vortexRadius;
+                    const flatZ = Math.sin(theta) * vortexRadius;
+                    const flatY = baseY * 0.3 + Math.sin(theta * 1.7 + seed.gap * Math.PI * 2) * 0.54;
+                    const tiltedY = flatY * tiltCos - flatZ * tiltSin;
+                    const tiltedZ = flatY * tiltSin + flatZ * tiltCos;
+                    targetX = THREE.MathUtils.lerp(baseX, flatX, vortexWeight);
+                    targetY = THREE.MathUtils.lerp(baseY, tiltedY, vortexWeight);
+                    targetZ = THREE.MathUtils.lerp(baseZ, tiltedZ, vortexWeight);
+                }
+
                 const spreadRadius = 2.4 + seed.radius * 8.2;
                 const spreadX = Math.cos(seed.angle) * spreadRadius;
                 const spreadY = seed.height * (3.8 + seed.radius * 4.5) + Math.sin(seed.angle * 2.4) * 0.9;
                 const spreadZ = Math.sin(seed.angle) * spreadRadius;
-                ringPositions[index] += (ringTargets[index] + spreadX * gestureSpread - ringPositions[index]) * ease;
-                ringPositions[index + 1] += (ringTargets[index + 1] + spreadY * gestureSpread - ringPositions[index + 1]) * ease;
-                ringPositions[index + 2] += (ringTargets[index + 2] + spreadZ * gestureSpread - ringPositions[index + 2]) * ease;
+                ringPositions[index] += (targetX + spreadX * gestureSpread - ringPositions[index]) * ease;
+                ringPositions[index + 1] += (targetY + spreadY * gestureSpread - ringPositions[index + 1]) * ease;
+                ringPositions[index + 2] += (targetZ + spreadZ * gestureSpread - ringPositions[index + 2]) * ease;
             }
         }
 

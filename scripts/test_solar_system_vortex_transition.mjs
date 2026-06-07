@@ -64,5 +64,13 @@ assertMatches(
   /function switchStage\(stage, immediate = false\) \{[\s\S]*bodyColorTo\.set\(bodyColors\);[\s\S]*ringColorTo\.set\(ringColors\);[\s\S]*if \(immediate\) \{[\s\S]*snapPlanetTransition\(\);/,
   "immediate stage setup cancels transition"
 );
+assertMatches(
+  /function moveBodyAttribute\(ease\) \{[\s\S]*const transitionActive = planetTransition\.active;[\s\S]*const vortexWeight = planetTransition\.vortexWeight;[\s\S]*const transitionSpin = planetTransition\.eased \* Math\.PI \* 1\.65;[\s\S]*const tiltSin = Math\.sin\(TRANSITION_VORTEX_TILT\);[\s\S]*targetX = THREE\.MathUtils\.lerp\(baseX, flatX, vortexWeight\);/,
+  "body vortex target math"
+);
+assertMatches(
+  /function moveRingAttribute\(ease\) \{[\s\S]*const transitionActive = planetTransition\.active;[\s\S]*const vortexWeight = planetTransition\.vortexWeight;[\s\S]*const transitionSpin = planetTransition\.eased \* Math\.PI \* 1\.45;[\s\S]*const tiltSin = Math\.sin\(TRANSITION_RING_TILT\);[\s\S]*targetX = THREE\.MathUtils\.lerp\(baseX, flatX, vortexWeight\);/,
+  "ring vortex target math"
+);
 
 console.log("Solar system vortex transition source checks passed.");
