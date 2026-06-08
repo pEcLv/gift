@@ -935,11 +935,14 @@
         const CAMERA_CENTERING_DISTANCE = 10;
         const SHOW_ORBIT_LINES = false;
         const SHOW_COMPANION_PLANETS = false;
+        const TRANSITION_DURATION = 1.1;
+        const TRANSITION_VORTEX_TILT = -0.34;
+        const TRANSITION_RING_TILT = -0.42;
         const clock = new THREE.Clock();
 
         let scene, camera, renderer, composer;
         let displayGroup, bodyPoints, ringPoints, starPoints, companionGroup;
-        let bodyPositions, bodyTargets, bodyColors, ringPositions, ringTargets, ringColors;
+        let bodyPositions, bodyTargets, bodyColors, bodyColorFrom, bodyColorTo, ringPositions, ringTargets, ringColors, ringColorFrom, ringColorTo;
         let activePlanetKey = "saturn";
         let activeStage = "planet";
         let targetTilt = PLANETS.saturn.tilt;
@@ -968,6 +971,17 @@
         let planetCoreMesh, planetCoreMaterial, depthMaskMesh;
         let targetCoreScale = 1.0;
         let targetCoreOpacity = 0.62;
+        const planetTransition = {
+            active: false,
+            startedAt: 0,
+            duration: TRANSITION_DURATION,
+            fromKey: "saturn",
+            toKey: "saturn",
+            progress: 1,
+            eased: 1,
+            vortexWeight: 0,
+            colorMix: 1
+        };
 
         let orbitLinesGroup;
         let nebulaPoints;
@@ -1383,6 +1397,8 @@
             bodyPositions = new Float32Array(BODY_COUNT * 3);
             bodyTargets = new Float32Array(BODY_COUNT * 3);
             bodyColors = new Float32Array(BODY_COUNT * 3);
+            bodyColorFrom = new Float32Array(BODY_COUNT * 3);
+            bodyColorTo = new Float32Array(BODY_COUNT * 3);
 
             for (let i = 0; i < BODY_COUNT; i++) {
                 bodySeeds.push({
@@ -1431,6 +1447,8 @@
             ringPositions = new Float32Array(RING_COUNT * 3);
             ringTargets = new Float32Array(RING_COUNT * 3);
             ringColors = new Float32Array(RING_COUNT * 3);
+            ringColorFrom = new Float32Array(RING_COUNT * 3);
+            ringColorTo = new Float32Array(RING_COUNT * 3);
 
             for (let i = 0; i < RING_COUNT; i++) {
                 ringSeeds.push({
@@ -2524,7 +2542,13 @@
             setRingTargets(planet);
             updateReadout(planet, activePlanetKey);
 
+            if (bodyColorTo && ringColorTo) {
+                bodyColorTo.set(bodyColors);
+                ringColorTo.set(ringColors);
+            }
+
             if (immediate) {
+                snapPlanetTransition();
                 bodyPositions.set(bodyTargets);
                 ringPositions.set(ringTargets);
                 bodyPoints.geometry.attributes.position.needsUpdate = true;
@@ -2555,6 +2579,15 @@
         function switchPlanet(key, immediate = false) {
             const planet = PLANETS[key];
             if (!planet) return;
+
+            const previousPlanetKey = activePlanetKey;
+            if (!immediate && previousPlanetKey === key) return;
+
+            const animateTransition = !immediate && bodyPoints && ringPoints && bodyColorFrom && bodyColorTo && ringColorFrom && ringColorTo;
+            if (animateTransition) {
+                bodyColorFrom.set(bodyColors);
+                ringColorFrom.set(ringColors);
+            }
 
             activePlanetKey = key;
             activeStage = "planet";
@@ -2587,12 +2620,19 @@
             setRingTargets(planet);
             updateReadout(planet, key);
 
+            if (animateTransition) {
+                beginPlanetTransition(previousPlanetKey, key);
+            }
+
+            if (!animateTransition) {
+                if (bodyColorTo && ringColorTo) {
+                    bodyColorTo.set(bodyColors);
+                    ringColorTo.set(ringColors);
+                }
+                snapPlanetTransition();
+            }
+
             if (immediate) {
-                bodyPositions.set(bodyTargets);
-                ringPositions.set(ringTargets);
-                bodyPoints.geometry.attributes.position.needsUpdate = true;
-                ringPoints.geometry.attributes.position.needsUpdate = true;
-                
                 if (ringMaterial) {
                     ringMaterial.uniforms.uOpacity.value = targetRingOpacity;
                 }
@@ -2625,6 +2665,81 @@
                 depthMaskMesh.visible = activeStage === "planet" && targetRingOpacity > 0.01;
                 depthMaskMesh.scale.setScalar(targetCoreScale * 1.006);
             }
+        }
+
+        function beginPlanetTransition(fromKey, toKey) {
+            if (!bodyPoints || !ringPoints || !bodyColorFrom || !bodyColorTo || !ringColorFrom || !ringColorTo) return;
+
+            planetTransition.active = fromKey !== toKey;
+            planetTransition.startedAt = clock.getElapsedTime();
+            planetTransition.fromKey = fromKey;
+            planetTransition.toKey = toKey;
+            planetTransition.progress = 0;
+            planetTransition.eased = 0;
+            planetTransition.vortexWeight = 0;
+            planetTransition.colorMix = 0;
+
+            bodyColorTo.set(bodyColors);
+            ringColorTo.set(ringColors);
+            bodyColors.set(bodyColorFrom);
+            ringColors.set(ringColorFrom);
+
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function updatePlanetTransition(time) {
+            if (!planetTransition.active) return;
+
+            const progress = THREE.MathUtils.clamp((time - planetTransition.startedAt) / planetTransition.duration, 0, 1);
+            planetTransition.progress = progress;
+            planetTransition.eased = THREE.MathUtils.smoothstep(progress, 0, 1);
+            planetTransition.vortexWeight = Math.sin(progress * Math.PI);
+            planetTransition.colorMix = THREE.MathUtils.smoothstep(progress, 0.2, 0.72);
+
+            mixTransitionColors();
+
+            if (progress >= 1) {
+                snapPlanetTransition();
+            }
+        }
+
+        function mixTransitionColors() {
+            if (!bodyColorFrom || !bodyColorTo || !ringColorFrom || !ringColorTo) return;
+
+            mixColorBuffer(bodyColors, bodyColorFrom, bodyColorTo, planetTransition.colorMix);
+            mixColorBuffer(ringColors, ringColorFrom, ringColorTo, planetTransition.colorMix);
+
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function mixColorBuffer(visible, from, to, amount) {
+            for (let i = 0; i < visible.length; i++) {
+                visible[i] = from[i] + (to[i] - from[i]) * amount;
+            }
+        }
+
+        function snapPlanetTransition() {
+            planetTransition.active = false;
+            planetTransition.progress = 1;
+            planetTransition.eased = 1;
+            planetTransition.vortexWeight = 0;
+            planetTransition.colorMix = 1;
+
+            if (!bodyPoints || !ringPoints) return;
+
+            bodyPositions.set(bodyTargets);
+            ringPositions.set(ringTargets);
+            bodyColors.set(bodyColorTo);
+            ringColors.set(ringColorTo);
+            bodyColorFrom.set(bodyColors);
+            ringColorFrom.set(ringColors);
+
+            bodyPoints.geometry.attributes.position.needsUpdate = true;
+            ringPoints.geometry.attributes.position.needsUpdate = true;
+            bodyPoints.geometry.attributes.color.needsUpdate = true;
+            ringPoints.geometry.attributes.color.needsUpdate = true;
         }
 
         function updateReadout(planet, key) {
@@ -2809,6 +2924,7 @@
             const delta = Math.min(Math.max(time - lastFrameTime, 0), 0.04);
             lastFrameTime = time;
             const planet = PLANETS[activePlanetKey];
+            updatePlanetTransition(time);
 
             if (activeStage !== "planet") targetGestureSpread = 0;
             if (gestureControl.mode === "fist") {
@@ -2927,29 +3043,83 @@
         }
 
         function moveBodyAttribute(ease) {
+            const transitionActive = planetTransition.active;
+            const vortexWeight = planetTransition.vortexWeight;
+            const transitionSpin = planetTransition.eased * Math.PI * 1.65;
+            const tiltSin = Math.sin(TRANSITION_VORTEX_TILT);
+            const tiltCos = Math.cos(TRANSITION_VORTEX_TILT);
+
             for (let i = 0; i < BODY_COUNT; i++) {
                 const seed = bodySeeds[i];
                 const index = i * 3;
-                const spreadX = bodyTargets[index] * (0.5 + seed.shell * 1.35) + Math.cos(seed.orbit) * (1.8 + seed.noise * 3.2);
-                const spreadY = bodyTargets[index + 1] * (0.4 + seed.noise * 1.35) + Math.sin(seed.theta * 2.1) * 2.4;
-                const spreadZ = bodyTargets[index + 2] * (0.5 + seed.shell * 1.35) + Math.sin(seed.orbit) * (1.8 + seed.noise * 3.2);
-                bodyPositions[index] += (bodyTargets[index] + spreadX * gestureSpread - bodyPositions[index]) * ease;
-                bodyPositions[index + 1] += (bodyTargets[index + 1] + spreadY * gestureSpread - bodyPositions[index + 1]) * ease;
-                bodyPositions[index + 2] += (bodyTargets[index + 2] + spreadZ * gestureSpread - bodyPositions[index + 2]) * ease;
+                const baseX = bodyTargets[index];
+                const baseY = bodyTargets[index + 1];
+                const baseZ = bodyTargets[index + 2];
+                let targetX = baseX;
+                let targetY = baseY;
+                let targetZ = baseZ;
+
+                if (transitionActive && vortexWeight > 0.001) {
+                    const theta = seed.theta + seed.orbit + transitionSpin;
+                    const baseRadius = Math.sqrt(baseX * baseX + baseY * baseY + baseZ * baseZ);
+                    const vortexRadius = baseRadius * (1.02 + seed.shell * 0.34) + 1.25 + seed.noise * 1.9;
+                    const flatX = Math.cos(theta) * vortexRadius;
+                    const flatZ = Math.sin(theta) * vortexRadius;
+                    const flatY = baseY * 0.16 + Math.sin(theta * 2.0 + seed.noise * Math.PI * 2) * 0.62;
+                    const tiltedY = flatY * tiltCos - flatZ * tiltSin;
+                    const tiltedZ = flatY * tiltSin + flatZ * tiltCos;
+                    targetX = THREE.MathUtils.lerp(baseX, flatX, vortexWeight);
+                    targetY = THREE.MathUtils.lerp(baseY, tiltedY, vortexWeight);
+                    targetZ = THREE.MathUtils.lerp(baseZ, tiltedZ, vortexWeight);
+                }
+
+                const spreadX = baseX * (0.5 + seed.shell * 1.35) + Math.cos(seed.orbit) * (1.8 + seed.noise * 3.2);
+                const spreadY = baseY * (0.4 + seed.noise * 1.35) + Math.sin(seed.theta * 2.1) * 2.4;
+                const spreadZ = baseZ * (0.5 + seed.shell * 1.35) + Math.sin(seed.orbit) * (1.8 + seed.noise * 3.2);
+                bodyPositions[index] += (targetX + spreadX * gestureSpread - bodyPositions[index]) * ease;
+                bodyPositions[index + 1] += (targetY + spreadY * gestureSpread - bodyPositions[index + 1]) * ease;
+                bodyPositions[index + 2] += (targetZ + spreadZ * gestureSpread - bodyPositions[index + 2]) * ease;
             }
         }
 
         function moveRingAttribute(ease) {
+            const transitionActive = planetTransition.active;
+            const vortexWeight = planetTransition.vortexWeight;
+            const transitionSpin = planetTransition.eased * Math.PI * 1.45;
+            const tiltSin = Math.sin(TRANSITION_RING_TILT);
+            const tiltCos = Math.cos(TRANSITION_RING_TILT);
+
             for (let i = 0; i < RING_COUNT; i++) {
                 const seed = ringSeeds[i];
                 const index = i * 3;
+                const baseX = ringTargets[index];
+                const baseY = ringTargets[index + 1];
+                const baseZ = ringTargets[index + 2];
+                let targetX = baseX;
+                let targetY = baseY;
+                let targetZ = baseZ;
+
+                if (transitionActive && vortexWeight > 0.001) {
+                    const theta = seed.angle + transitionSpin + seed.band * Math.PI * 2;
+                    const baseRadius = Math.sqrt(baseX * baseX + baseZ * baseZ);
+                    const vortexRadius = baseRadius * (1.04 + seed.radius * 0.26) + 1.8 + seed.band * 2.8;
+                    const flatX = Math.cos(theta) * vortexRadius;
+                    const flatZ = Math.sin(theta) * vortexRadius;
+                    const flatY = baseY * 0.3 + Math.sin(theta * 1.7 + seed.gap * Math.PI * 2) * 0.54;
+                    const tiltedY = flatY * tiltCos - flatZ * tiltSin;
+                    const tiltedZ = flatY * tiltSin + flatZ * tiltCos;
+                    targetX = THREE.MathUtils.lerp(baseX, flatX, vortexWeight);
+                    targetY = THREE.MathUtils.lerp(baseY, tiltedY, vortexWeight);
+                    targetZ = THREE.MathUtils.lerp(baseZ, tiltedZ, vortexWeight);
+                }
+
                 const spreadRadius = 2.4 + seed.radius * 8.2;
                 const spreadX = Math.cos(seed.angle) * spreadRadius;
                 const spreadY = seed.height * (3.8 + seed.radius * 4.5) + Math.sin(seed.angle * 2.4) * 0.9;
                 const spreadZ = Math.sin(seed.angle) * spreadRadius;
-                ringPositions[index] += (ringTargets[index] + spreadX * gestureSpread - ringPositions[index]) * ease;
-                ringPositions[index + 1] += (ringTargets[index + 1] + spreadY * gestureSpread - ringPositions[index + 1]) * ease;
-                ringPositions[index + 2] += (ringTargets[index + 2] + spreadZ * gestureSpread - ringPositions[index + 2]) * ease;
+                ringPositions[index] += (targetX + spreadX * gestureSpread - ringPositions[index]) * ease;
+                ringPositions[index + 1] += (targetY + spreadY * gestureSpread - ringPositions[index + 1]) * ease;
+                ringPositions[index + 2] += (targetZ + spreadZ * gestureSpread - ringPositions[index + 2]) * ease;
             }
         }
 
