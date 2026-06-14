@@ -2199,7 +2199,7 @@
 
             window.addEventListener("wheel", (event) => {
                 if (event.target.closest(".chrome")) return;
-                targetCameraDistance = clampCameraDistance(targetCameraDistance + event.deltaY * 0.012);
+                targetCameraDistance = clampCameraDistance(targetCameraDistance + event.deltaY * 0.006);
             }, { passive: true });
         }
 
@@ -2989,10 +2989,10 @@
 
             if (activeStage !== "planet") targetGestureSpread = 0;
             if (gestureControl.mode === "fist") {
-                targetCameraDistance = clampCameraDistance(targetCameraDistance - delta * 8.8);
+                targetCameraDistance = clampCameraDistance(targetCameraDistance - delta * 4.4);
             }
             if (gestureControl.mode === "open") {
-                targetCameraDistance = clampCameraDistance(targetCameraDistance + delta * 8.8);
+                targetCameraDistance = clampCameraDistance(targetCameraDistance + delta * 4.4);
             }
 
             gestureSpread = THREE.MathUtils.lerp(gestureSpread, targetGestureSpread, 0.075);

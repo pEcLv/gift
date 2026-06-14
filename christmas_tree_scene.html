@@ -1068,7 +1068,7 @@
             gestureControl.twoHandSpan = normalizedSpan;
 
             if (Math.abs(spanDelta) > 0.055) {
-                targetCameraDistance = clampCameraDistance(targetCameraDistance - spanDelta * 6.8);
+                targetCameraDistance = clampCameraDistance(targetCameraDistance - spanDelta * 3.4);
                 setGestureMode("zoom", spanDelta > 0 ? "双手拉开：拉近视距" : "双手合拢：拉远视距");
                 return true;
             }
