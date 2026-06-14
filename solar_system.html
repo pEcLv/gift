@@ -2136,7 +2136,10 @@
             const hideUiBtn = document.getElementById("hide-ui");
             if (hideUiBtn) {
                 hideUiBtn.addEventListener("click", () => {
-                    document.body.classList.toggle("ui-hidden");
+                    const isHidden = document.body.classList.toggle("ui-hidden");
+                    if (window.parent !== window) {
+                        window.parent.postMessage({ type: 'toggle-ui', hidden: isHidden }, "*");
+                    }
                 });
             }
         }

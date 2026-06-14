@@ -90,6 +90,13 @@
                 left: 20px;
             }
         }
+
+        body.ui-hidden .global-switch {
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+            transition: opacity 380ms ease, visibility 380ms ease;
+        }
     </style>
 </head>
 <body>
@@ -132,6 +139,12 @@
         });
 
         switchScene(defaultScene);
+
+        window.addEventListener("message", (event) => {
+            if (event.data && event.data.type === "toggle-ui") {
+                document.body.classList.toggle("ui-hidden", event.data.hidden);
+            }
+        });
     </script>
 </body>
 </html>
