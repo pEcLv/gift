@@ -2078,6 +2078,19 @@
             });
 
             gestureButton.addEventListener("click", startGestureControl);
+
+            const fullscreenBtn = document.getElementById("fullscreen");
+            if (fullscreenBtn) {
+                fullscreenBtn.addEventListener("click", () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(err => {
+                            console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                        });
+                    } else {
+                        document.exitFullscreen();
+                    }
+                });
+            }
         }
 
         function setupEvents() {
