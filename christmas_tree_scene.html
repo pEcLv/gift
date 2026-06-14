@@ -527,7 +527,7 @@
         <button class="mode-button" type="button" data-mode="scatter">散开</button>
         <button class="mode-button" type="button" data-mode="focus">照片</button>
         <button class="upload-button" type="button" id="upload-trigger">添加照片</button>
-        <input id="image-upload" type="file" accept="image/*" hidden>
+        <input id="image-upload" type="file" accept="image/*" hidden multiple>
     </div>
 
     <div id="loader">
@@ -839,19 +839,21 @@
             const upload = document.getElementById("image-upload");
             document.getElementById("upload-trigger").addEventListener("click", () => upload.click());
             upload.addEventListener("change", (event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (loadEvent) => {
-                    const dataURL = loadEvent.target.result;
-                    new THREE.TextureLoader().load(dataURL, (texture) => {
-                        texture.colorSpace = THREE.SRGBColorSpace;
-                        activePhotoIndex = addPhotoCard(texture);
-                        setMode("focus");
-                        savePhotoToDB(dataURL);
-                    });
-                };
-                reader.readAsDataURL(file);
+                const files = event.target.files;
+                if (!files || files.length === 0) return;
+                Array.from(files).forEach((file) => {
+                    const reader = new FileReader();
+                    reader.onload = (loadEvent) => {
+                        const dataURL = loadEvent.target.result;
+                        new THREE.TextureLoader().load(dataURL, (texture) => {
+                            texture.colorSpace = THREE.SRGBColorSpace;
+                            activePhotoIndex = addPhotoCard(texture);
+                            setMode("focus");
+                            savePhotoToDB(dataURL);
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                });
                 upload.value = "";
             });
 
