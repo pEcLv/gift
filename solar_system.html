@@ -2112,12 +2112,23 @@
             const fullscreenBtn = document.getElementById("fullscreen");
             if (fullscreenBtn) {
                 fullscreenBtn.addEventListener("click", () => {
-                    if (!document.fullscreenElement) {
-                        document.documentElement.requestFullscreen().catch(err => {
-                            console.log(`Error attempting to enable fullscreen: ${err.message}`);
-                        });
-                    } else {
-                        document.exitFullscreen();
+                    try {
+                        const targetDoc = window.parent !== window ? window.parent.document : document;
+                        if (!targetDoc.fullscreenElement) {
+                            targetDoc.documentElement.requestFullscreen().catch(err => {
+                                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                            });
+                        } else {
+                            targetDoc.exitFullscreen();
+                        }
+                    } catch (e) {
+                        if (!document.fullscreenElement) {
+                            document.documentElement.requestFullscreen().catch(err => {
+                                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                            });
+                        } else {
+                            document.exitFullscreen();
+                        }
                     }
                 });
             }

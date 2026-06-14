@@ -858,10 +858,19 @@
             });
 
             document.getElementById("fullscreen").addEventListener("click", () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch(() => {});
-                } else {
-                    document.exitFullscreen();
+                try {
+                    const targetDoc = window.parent !== window ? window.parent.document : document;
+                    if (!targetDoc.fullscreenElement) {
+                        targetDoc.documentElement.requestFullscreen().catch(() => {});
+                    } else {
+                        targetDoc.exitFullscreen();
+                    }
+                } catch (e) {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(() => {});
+                    } else {
+                        document.exitFullscreen();
+                    }
                 }
             });
 
