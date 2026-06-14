@@ -1130,7 +1130,7 @@
                 }
                 vColor = finalCol;
                 
-                float twinkle = sin(uTime * 3.8 + pos.x * 6.5 + pos.y * 8.5) * 0.18 + 0.82;
+                float twinkle = sin(uTime * 3.8 + pos.x * 6.5 + pos.y * 8.5 + pos.z * 7.2) * 0.18 + 0.82;
                 vOpacity = twinkle;
                 
                 vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
