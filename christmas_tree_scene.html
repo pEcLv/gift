@@ -141,7 +141,8 @@
         }
 
         .mode-button,
-        .upload-button {
+        .upload-button,
+        .delete-button {
             min-width: 0;
             height: 48px;
             border: 1px solid rgba(255, 241, 196, 0.14);
@@ -162,16 +163,34 @@
             flex: 1 1 0;
         }
 
-        .upload-button {
+        .upload-button,
+        .delete-button {
             flex: 1.15 1 0;
         }
 
         .mode-button:hover,
-        .upload-button:hover {
+        .upload-button:hover,
+        .delete-button:hover {
             transform: translateY(-2px);
             color: var(--cream);
             border-color: rgba(255, 241, 196, 0.42);
             background: rgba(255, 241, 196, 0.07);
+        }
+
+        .delete-button {
+            color: rgba(255, 212, 204, 0.78);
+            border-color: rgba(217, 72, 63, 0.28);
+        }
+
+        .delete-button:hover {
+            border-color: rgba(217, 72, 63, 0.64);
+            background: rgba(217, 72, 63, 0.12);
+        }
+
+        .delete-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+            transform: none;
         }
 
         .mode-button.active {
@@ -527,6 +546,7 @@
         <button class="mode-button" type="button" data-mode="scatter">散开</button>
         <button class="mode-button" type="button" data-mode="focus">照片</button>
         <button class="upload-button" type="button" id="upload-trigger">添加照片</button>
+        <button class="delete-button" type="button" id="delete-photos">删除照片</button>
         <input id="image-upload" type="file" accept="image/*" hidden multiple>
     </div>
 
@@ -795,6 +815,20 @@
             }
         }
 
+        async function clearPhotosFromDB() {
+            try {
+                const db = await initDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).clear();
+                return new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+            } catch (e) {
+                console.error("Failed to clear local photos", e);
+            }
+        }
+
         async function loadPhotosFromRemote() {
             if (window.location.protocol === "file:") return [];
 
@@ -831,6 +865,27 @@
 
             if (!response.ok) {
                 let message = `Remote photo save failed: ${response.status}`;
+                try {
+                    const payload = await response.json();
+                    if (payload.error) message = payload.error;
+                } catch (e) {}
+                throw new Error(message);
+            }
+
+            return response.json();
+        }
+
+        async function deletePhotosFromRemote() {
+            if (window.location.protocol === "file:") {
+                throw new Error("Remote photo API is unavailable from a local file");
+            }
+
+            const response = await fetch(PHOTO_API_URL, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                let message = `Remote photo delete failed: ${response.status}`;
                 try {
                     const payload = await response.json();
                     if (payload.error) message = payload.error;
@@ -950,6 +1005,7 @@
 
             const upload = document.getElementById("image-upload");
             document.getElementById("upload-trigger").addEventListener("click", () => upload.click());
+            document.getElementById("delete-photos").addEventListener("click", handleDeletePhotos);
             upload.addEventListener("change", async (event) => {
                 const files = event.target.files;
                 if (!files || files.length === 0) return;
@@ -1030,6 +1086,53 @@
                 console.error("Failed to process photo", e);
                 setGestureMessage("照片处理失败");
             }
+        }
+
+        async function handleDeletePhotos() {
+            if (photos.length <= 1) {
+                setGestureMessage("没有可删除的照片");
+                return;
+            }
+
+            if (!window.confirm("删除所有已上传照片？")) return;
+
+            const deleteButton = document.getElementById("delete-photos");
+            deleteButton.disabled = true;
+
+            try {
+                if (window.location.protocol !== "file:") {
+                    await deletePhotosFromRemote();
+                }
+                await clearPhotosFromDB();
+                clearUploadedPhotoCards();
+                if (activeMode === "focus") setMode("focus");
+                setGestureMessage("照片已删除");
+            } catch (e) {
+                console.error("Failed to delete photos", e);
+                setGestureMessage("删除失败");
+            } finally {
+                deleteButton.disabled = false;
+            }
+        }
+
+        function clearUploadedPhotoCards() {
+            while (photos.length > 1) {
+                const card = photos.pop();
+                photoGroup.remove(card);
+                disposePhotoCard(card);
+            }
+            activePhotoIndex = 0;
+        }
+
+        function disposePhotoCard(card) {
+            card.traverse((child) => {
+                if (!child.material) return;
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach((material) => {
+                    if (material.map) material.map.dispose();
+                    material.dispose();
+                });
+            });
         }
 
         async function startGestureControl() {

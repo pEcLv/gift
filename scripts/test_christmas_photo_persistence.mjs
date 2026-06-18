@@ -31,14 +31,25 @@ assert(
 assertMatches(apiSource, /["']@vercel\/blob["']/, "Vercel Blob SDK reference");
 assertMatches(apiSource, /async function handlePostPhoto/, "photo upload POST handler");
 assertMatches(apiSource, /async function handleGetPhotos/, "photo list GET handler");
+assertMatches(apiSource, /async function handleDeletePhotos/, "photo batch delete handler");
 assertMatches(apiSource, /prefix:\s*PHOTO_PREFIX/, "Blob list prefix");
+assertMatches(apiSource, /const \{ del \} = await getBlobClient\(\);/, "Vercel Blob delete client");
+assertMatches(apiSource, /await del\(pathnames\)/, "batch Blob deletion");
+assertMatches(apiSource, /res\.setHeader\("Allow", "GET, POST, DELETE"\)/, "DELETE method allow header");
 
 assertMatches(treeHtml, /const PHOTO_API_URL = "\/api\/photos";/, "photo API URL constant");
+assertMatches(treeHtml, /<button class="delete-button" type="button" id="delete-photos">删除照片<\/button>/, "photo delete button");
 assertMatches(treeHtml, /async function loadPhotosFromRemote\(\)/, "remote photo loader");
 assertMatches(treeHtml, /async function savePhotoToRemote\(dataURL, file\)/, "remote photo saver");
+assertMatches(treeHtml, /async function deletePhotosFromRemote\(\)/, "remote photo batch deleter");
+assertMatches(treeHtml, /async function clearPhotosFromDB\(\)/, "IndexedDB photo clearer");
+assertMatches(treeHtml, /function clearUploadedPhotoCards\(\)/, "scene photo card clearer");
+assertMatches(treeHtml, /async function handleDeletePhotos\(\)/, "delete button handler");
 assertMatches(treeHtml, /async function resizePhotoForUpload\(file\)/, "client photo resize before upload");
 assertMatches(treeHtml, /const remotePhotos = await loadPhotosFromRemote\(\);/, "startup remote photo load");
 assertMatches(treeHtml, /await savePhotoToRemote\(dataURL, file\);/, "upload persists to remote API");
 assertMatches(treeHtml, /await savePhotoToDB\(dataURL\);/, "IndexedDB fallback when remote upload fails");
+assertMatches(treeHtml, /await deletePhotosFromRemote\(\);/, "delete handler calls remote API");
+assertMatches(treeHtml, /await clearPhotosFromDB\(\);/, "delete handler clears local fallback");
 
 console.log("Christmas photo persistence source checks passed.");

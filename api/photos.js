@@ -8,14 +8,8 @@ let blobClientPromise;
 async function handleGetPhotos(req, res) {
   ensureBlobToken();
 
-  const { list } = await getBlobClient();
-  const result = await list({
-    prefix: PHOTO_PREFIX,
-    limit: 100
-  });
-
-  const photos = result.blobs
-    .filter((blob) => blob.pathname && blob.pathname.startsWith(PHOTO_PREFIX))
+  const photos = await listPhotoBlobs();
+  const payload = photos
     .sort((a, b) => new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime())
     .map((blob) => ({
       url: blob.url,
@@ -24,7 +18,7 @@ async function handleGetPhotos(req, res) {
       uploadedAt: blob.uploadedAt
     }));
 
-  sendJson(res, 200, { photos });
+  sendJson(res, 200, { photos: payload });
 }
 
 async function handlePostPhoto(req, res) {
@@ -53,6 +47,20 @@ async function handlePostPhoto(req, res) {
   });
 }
 
+async function handleDeletePhotos(req, res) {
+  ensureBlobToken();
+
+  const { del } = await getBlobClient();
+  const photos = await listPhotoBlobs();
+  const pathnames = photos.map((blob) => blob.pathname).filter(Boolean);
+
+  if (pathnames.length) {
+    await del(pathnames);
+  }
+
+  sendJson(res, 200, { deleted: pathnames.length });
+}
+
 module.exports = async function photosHandler(req, res) {
   try {
     if (req.method === "GET") {
@@ -65,7 +73,12 @@ module.exports = async function photosHandler(req, res) {
       return;
     }
 
-    res.setHeader("Allow", "GET, POST");
+    if (req.method === "DELETE") {
+      await handleDeletePhotos(req, res);
+      return;
+    }
+
+    res.setHeader("Allow", "GET, POST, DELETE");
     sendJson(res, 405, { error: "Method not allowed" });
   } catch (error) {
     const statusCode = error.statusCode || 500;
@@ -81,6 +94,24 @@ function getBlobClient() {
   }
 
   return blobClientPromise;
+}
+
+async function listPhotoBlobs() {
+  const { list } = await getBlobClient();
+  const blobs = [];
+  let cursor;
+
+  do {
+    const result = await list({
+      prefix: PHOTO_PREFIX,
+      limit: 1000,
+      cursor
+    });
+    blobs.push(...result.blobs);
+    cursor = result.cursor;
+  } while (cursor);
+
+  return blobs.filter((blob) => blob.pathname && blob.pathname.startsWith(PHOTO_PREFIX));
 }
 
 function ensureBlobToken() {
