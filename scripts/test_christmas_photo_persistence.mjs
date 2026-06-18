@@ -43,6 +43,8 @@ assertMatches(treeHtml, /async function loadPhotosFromRemote\(\)/, "remote photo
 assertMatches(treeHtml, /async function savePhotoToRemote\(dataURL, file\)/, "remote photo saver");
 assertMatches(treeHtml, /async function deletePhotosFromRemote\(\)/, "remote photo batch deleter");
 assertMatches(treeHtml, /async function clearPhotosFromDB\(\)/, "IndexedDB photo clearer");
+assertMatches(treeHtml, /const existingPhotos = await loadPhotosFromDB\(\);[\s\S]*if \(existingPhotos\.includes\(dataURL\)\) return;/, "IndexedDB duplicate save guard");
+assertMatches(treeHtml, /Array\.from\(new Set\(request\.result \|\| \[\]\)\)/, "IndexedDB load deduplication");
 assertMatches(treeHtml, /function clearUploadedPhotoCards\(\)/, "scene photo card clearer");
 assertMatches(treeHtml, /async function handleDeletePhotos\(\)/, "delete button handler");
 assertMatches(treeHtml, /const DEFAULT_PHOTO_DELETED_KEY = "christmas-tree-default-photo-deleted";/, "default photo deleted flag");
@@ -51,6 +53,9 @@ assertMatches(treeHtml, /function markDefaultPhotoDeleted\(\)/, "default photo d
 assertMatches(treeHtml, /if \(!loadedPhotoCount && shouldShowDefaultPhoto\(\)\)/, "default photo appears only when allowed and no uploads exist");
 assertMatches(treeHtml, /async function resizePhotoForUpload\(file\)/, "client photo resize before upload");
 assertMatches(treeHtml, /const remotePhotos = await loadPhotosFromRemote\(\);/, "startup remote photo load");
+assertMatches(treeHtml, /let remoteLoadedCount = 0;/, "remote photo loaded counter");
+assertMatches(treeHtml, /if \(await addPhotoFromSource\(photo\.url\)\) \{[\s\S]*remoteLoadedCount\+\+;/, "remote photo counter increments");
+assertMatches(treeHtml, /if \(remoteLoadedCount > 0\) \{[\s\S]*await clearPhotosFromDB\(\);[\s\S]*\} else \{[\s\S]*const storedPhotos = await loadPhotosFromDB\(\);/, "local fallback is skipped when remote photos exist");
 assertMatches(treeHtml, /await savePhotoToRemote\(dataURL, file\);/, "upload persists to remote API");
 assertMatches(treeHtml, /await savePhotoToDB\(dataURL\);/, "IndexedDB fallback when remote upload fails");
 assertMatches(treeHtml, /await deletePhotosFromRemote\(\);/, "delete handler calls remote API");

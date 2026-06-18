@@ -793,6 +793,9 @@
 
         async function savePhotoToDB(dataURL) {
             try {
+                const existingPhotos = await loadPhotosFromDB();
+                if (existingPhotos.includes(dataURL)) return;
+
                 const db = await initDB();
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 tx.objectStore(STORE_NAME).add(dataURL);
@@ -807,7 +810,7 @@
                 const tx = db.transaction(STORE_NAME, 'readonly');
                 const request = tx.objectStore(STORE_NAME).getAll();
                 return new Promise((resolve, reject) => {
-                    request.onsuccess = () => resolve(request.result || []);
+                    request.onsuccess = () => resolve(Array.from(new Set(request.result || [])));
                     request.onerror = () => reject(request.error);
                 });
             } catch (e) {
@@ -976,14 +979,22 @@
 
         async function setupPhotos() {
             let loadedPhotoCount = 0;
+            let remoteLoadedCount = 0;
             const remotePhotos = await loadPhotosFromRemote();
             for (const photo of remotePhotos) {
-                if (await addPhotoFromSource(photo.url)) loadedPhotoCount++;
+                if (await addPhotoFromSource(photo.url)) {
+                    loadedPhotoCount++;
+                    remoteLoadedCount++;
+                }
             }
 
-            const storedPhotos = await loadPhotosFromDB();
-            for (const dataURL of storedPhotos) {
-                if (await addPhotoFromSource(dataURL)) loadedPhotoCount++;
+            if (remoteLoadedCount > 0) {
+                await clearPhotosFromDB();
+            } else {
+                const storedPhotos = await loadPhotosFromDB();
+                for (const dataURL of storedPhotos) {
+                    if (await addPhotoFromSource(dataURL)) loadedPhotoCount++;
+                }
             }
 
             if (!loadedPhotoCount && shouldShowDefaultPhoto()) {
