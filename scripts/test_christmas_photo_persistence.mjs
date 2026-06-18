@@ -45,11 +45,21 @@ assertMatches(treeHtml, /async function deletePhotosFromRemote\(\)/, "remote pho
 assertMatches(treeHtml, /async function clearPhotosFromDB\(\)/, "IndexedDB photo clearer");
 assertMatches(treeHtml, /function clearUploadedPhotoCards\(\)/, "scene photo card clearer");
 assertMatches(treeHtml, /async function handleDeletePhotos\(\)/, "delete button handler");
+assertMatches(treeHtml, /const DEFAULT_PHOTO_DELETED_KEY = "christmas-tree-default-photo-deleted";/, "default photo deleted flag");
+assertMatches(treeHtml, /function shouldShowDefaultPhoto\(\)/, "default photo visibility check");
+assertMatches(treeHtml, /function markDefaultPhotoDeleted\(\)/, "default photo deletion marker");
+assertMatches(treeHtml, /if \(!loadedPhotoCount && shouldShowDefaultPhoto\(\)\)/, "default photo appears only when allowed and no uploads exist");
 assertMatches(treeHtml, /async function resizePhotoForUpload\(file\)/, "client photo resize before upload");
 assertMatches(treeHtml, /const remotePhotos = await loadPhotosFromRemote\(\);/, "startup remote photo load");
 assertMatches(treeHtml, /await savePhotoToRemote\(dataURL, file\);/, "upload persists to remote API");
 assertMatches(treeHtml, /await savePhotoToDB\(dataURL\);/, "IndexedDB fallback when remote upload fails");
 assertMatches(treeHtml, /await deletePhotosFromRemote\(\);/, "delete handler calls remote API");
 assertMatches(treeHtml, /await clearPhotosFromDB\(\);/, "delete handler clears local fallback");
+assertMatches(treeHtml, /markDefaultPhotoDeleted\(\);/, "delete handler hides default photo after refresh");
+
+assert(
+  !/photos\.length <= 1/.test(treeHtml),
+  "Delete handler must not treat the default photo as undeletable"
+);
 
 console.log("Christmas photo persistence source checks passed.");

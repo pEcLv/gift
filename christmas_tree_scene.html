@@ -778,6 +778,7 @@
         const PHOTO_UPLOAD_QUALITY = 0.86;
         const DB_NAME = 'ChristmasTreeDB';
         const STORE_NAME = 'photos';
+        const DEFAULT_PHOTO_DELETED_KEY = "christmas-tree-default-photo-deleted";
 
         function initDB() {
             return new Promise((resolve, reject) => {
@@ -813,6 +814,20 @@
                 console.error("Failed to load photos", e);
                 return [];
             }
+        }
+
+        function shouldShowDefaultPhoto() {
+            try {
+                return window.localStorage.getItem(DEFAULT_PHOTO_DELETED_KEY) !== "1";
+            } catch (e) {
+                return true;
+            }
+        }
+
+        function markDefaultPhotoDeleted() {
+            try {
+                window.localStorage.setItem(DEFAULT_PHOTO_DELETED_KEY, "1");
+            } catch (e) {}
         }
 
         async function clearPhotosFromDB() {
@@ -952,21 +967,27 @@
             try {
                 const texture = await loadPhotoTexture(source);
                 addPhotoCard(texture);
+                return true;
             } catch (e) {
                 console.warn("Failed to add photo", e);
+                return false;
             }
         }
 
         async function setupPhotos() {
-            addPhotoCard(createDefaultPhotoTexture());
+            let loadedPhotoCount = 0;
             const remotePhotos = await loadPhotosFromRemote();
             for (const photo of remotePhotos) {
-                await addPhotoFromSource(photo.url);
+                if (await addPhotoFromSource(photo.url)) loadedPhotoCount++;
             }
 
             const storedPhotos = await loadPhotosFromDB();
             for (const dataURL of storedPhotos) {
-                await addPhotoFromSource(dataURL);
+                if (await addPhotoFromSource(dataURL)) loadedPhotoCount++;
+            }
+
+            if (!loadedPhotoCount && shouldShowDefaultPhoto()) {
+                addPhotoCard(createDefaultPhotoTexture(), { isDefaultPhoto: true });
             }
         }
 
@@ -1089,7 +1110,7 @@
         }
 
         async function handleDeletePhotos() {
-            if (photos.length <= 1) {
+            if (!photos.length) {
                 setGestureMessage("没有可删除的照片");
                 return;
             }
@@ -1100,12 +1121,18 @@
             deleteButton.disabled = true;
 
             try {
-                if (window.location.protocol !== "file:") {
+                const hasUploadedPhotos = photos.some((card) => !card.userData.isDefaultPhoto);
+                if (hasUploadedPhotos && window.location.protocol !== "file:") {
                     await deletePhotosFromRemote();
                 }
                 await clearPhotosFromDB();
+                markDefaultPhotoDeleted();
                 clearUploadedPhotoCards();
-                if (activeMode === "focus") setMode("focus");
+                if (activeMode === "focus" && !photos.length) {
+                    setMode("tree");
+                } else if (activeMode === "focus") {
+                    setMode("focus");
+                }
                 setGestureMessage("照片已删除");
             } catch (e) {
                 console.error("Failed to delete photos", e);
@@ -1116,7 +1143,7 @@
         }
 
         function clearUploadedPhotoCards() {
-            while (photos.length > 1) {
+            while (photos.length) {
                 const card = photos.pop();
                 photoGroup.remove(card);
                 disposePhotoCard(card);
@@ -1688,7 +1715,7 @@
             return seed.jitter > 0.55 ? "#2fb36f" : "#184d31";
         }
 
-        function addPhotoCard(texture) {
+        function addPhotoCard(texture, options = {}) {
             const card = new THREE.Group();
             const frame = new THREE.Mesh(
                 new THREE.BoxGeometry(3.35, 4.05, 0.1),
@@ -1700,6 +1727,7 @@
             );
             image.position.set(0, 0.4, 0.08);
             card.add(frame, image);
+            card.userData.isDefaultPhoto = Boolean(options.isDefaultPhoto);
             card.scale.setScalar(0.62);
             photoGroup.add(card);
             photos.push(card);
