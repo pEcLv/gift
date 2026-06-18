@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "test:photos": "node scripts/test_christmas_photo_persistence.mjs"
+  },
+  "dependencies": {
+    "@vercel/blob": "^1.0.2"
+  }
+}
